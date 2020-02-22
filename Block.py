@@ -150,25 +150,34 @@ class Indicator(QLabel):
     """
     def __int__(self,*args,**kwargs):
         QLabel.__init__(self,*args,**kwargs)
-        #self.setText(" ")
-        #self.setStyleSheet("border: 2px solid red")
+        self.Fill=False ##是否填充
+        self.setText("AA")
+        self.setStyleSheet("border: 2px solid red")
         #self.resize(0,0)
-        #self.move(0,0)
+        self.move(10,10)
 
     def mouseMoveEvent(self,event):
-        print("Moving"+ random.choice(['1','2','3']))
-        #QLabel.mouseMoveEvent(self,event)
+        print("Moving")
+        QLabel.mouseMoveEvent(self,event)
 
     def mousePressEvent(self,event):
         print("press_down")
-        btn=Utils().get_mouse_btn(event)
+        btn=get_mouse_btn(event)
         if btn=='LEFT':
             self.setCursor(Qt.ClosedHandCursor)
-        #QLabel.mousePressEvent(self,event)
+        QLabel.mousePressEvent(self,event)
+    
     def mouseReleaseEvent(self,event):
+        ###在Fill情况下当右键按下抬起后删除点击的box###
+        btn=get_mouse_btn(event)
+        x,y=get_mouse_pos(event)
+        if self.Fill:
+            self.setGeometry(0,0,0,0)
+            self.setStyleSheet("")
         print("relase")
         self.setCursor(Qt.ArrowCursor)
-        #QLabel.mouseReleaseEvent(self,event)
+        QLabel.mouseReleaseEvent(self,event)
+
 
 
 
@@ -185,12 +194,19 @@ class Img(QLabel):
         self.Displayed_Img=None
         self.Scale_Factor=1
         self.setAlignment(Qt.AlignTop|Qt.AlignLeft)
+        self.Pressed_Mouse=None
+        self.Mouse_Press_Loc=[]
+        #self.Indicator_LayOut=QHBoxLayout(self)
+        
+        self.Test=QLabel(self)
         self.__Init_UI(Filename)
 
     def __Init_UI(self,Filename):
         self.__Load_Img(Filename)
         self.__Display_Img(self.Src_Img)
         self.setStyleSheet("border: 2px solid red")
+        self.Test.setStyleSheet("border:1px solid red")
+        self.Test.resize(100,100)
     
     def __Load_Img(self,Filename):
         Cv_Img=cv2.imread(Filename)
@@ -209,47 +225,87 @@ class Img(QLabel):
     def mousePressEvent(self,event):
         btn=get_mouse_btn(event)
         x,y=get_mouse_pos(event)
-        if btn="LEFT" and self.Action_Type=='WB':
+        self.Pressed_Mouse=btn
+        self.Mouse_Press_Loc=[x,y]
+
+        if btn=="LEFT" and self.Action_Type=='WB':
+            print("WB_LEFT")
             if self.Box:
                 indicator=self.Box[0]
             else:
                 #需要新建
-                indictor=Indicator('',self)
-                self.Box.append(indictor)
+                indicator=Indicator(self)
+                indicator.Fill=False
+                indicator.show()#更新后才会显示出来
+                self.Box.append(indicator)
+                #self.Indicator_LayOut.addWidget(indicator)
             
-            indictor.setStyleSheet("border:1px solid red")
-            indictor.setGeometry(x,y,0,0)
+            indicator.setStyleSheet("border:1px solid blue")
+            indicator.setGeometry(x,y,0,0)
                     
-        if btn="LEFT" and self.Action_Type=='BKGD':
+        if btn=="LEFT" and self.Action_Type=='BKGD':
+            print("BKGD_LEFT")
+            indicator=None
             PressedBtn=Get_Pressed_Key(self)
-            
-            if PressedBtn==Qt.Key_Control:
-                if 0<len(self.Box)<self.Allowed_Box_Num:
-                    ##遍历box看有没有没有用的##
-                    for b in self.Box:
-                        if b.width()==0
-                        indicator=b
-                        break
-                    else:
-
-                    indictor=Indicator('',self)
-                    self.Box.append(indicator)
-                    ###
-                    Marker_size=[10,4]
-                    ###
-                    indicator.setStyleSheet("background:green")
-                    indicator.setGeometry(x-5,y-2,10,4)
-                else:
-                    print("Box if Full")
+            ###Box是空的时候直接添加
+            if not self.Box:
+                indicator=Indicator(self)
+                indicator.Fill=True
+                indicator.show()
+                self.Box.append(indicator)  
             else:
-
-                ###不按着Ctrl的时候隐藏所有Box####
-                for box in self.Box:
-                    box.setGeometry(0,0,0,0)
-                    box.setStyleSheet("")
-                indicator=box[0]
-
+                if PressedBtn==Qt.Key_Control:
+                    if 0<len(self.Box)<self.Allowed_Box_Num:
+                        ##遍历box看有没有没有用的##
+                        for b in self.Box:
+                            if b.width()==0:
+                                indicator=b
+                                break
+                        
+                        #如果遍历后还是没有
+                        if not indicator:
+                            indicator=Indicator(self)
+                            indicator.Fill=True
+                            indicator.show()
+                            self.Box.append(indicator)
+                            #self.Indicator_LayOut.addWidget(indicator)
+                    
+                    else:
+                        print("Box is Full")
+                        ###indicator 依然是None
                 
+                else:
+                    ###不按着Ctrl的时候隐藏所有Box,返回第一个box####
+                    for box in self.Box:
+                        box.setGeometry(0,0,0,0)
+                        box.setStyleSheet("")
+                    indicator=self.Box[0]
+            
+            ###
+            Marker_w=40
+            Marker_h=10
+            ###
+            if indicator:
+                indicator.setStyleSheet("background:green")
+                indicator.setGeometry(x-Marker_w/2,y-Marker_h/2,Marker_w,Marker_h)
+    
+    def mouseMoveEvent(self,mE):
+        x,y=get_mouse_pos(mE)
+        btn=get_mouse_btn(mE)
+        mes="Image Pointer (x:%s y:%s) |Scale: %s" %(str(x),str(y),str(self.Scale_Factor))
+        t=Get_Super_Parent(self)
+        t.statusbar.showMessage("Ready "+ mes)
+    
+        #移动的时候一直按着左键
+        if self.Action_Type=="WB" and self.Pressed_Mouse=="LEFT":
+            indicator=self.Box[0]
+            x,y,w,h=Rect_From_Two_Point(self.Mouse_Press_Loc,[x,y])
+            indicator.setGeometry(x,y,w,h)
+                 
+    def mouseReleaseEvent(self,event):
+        btn=get_mouse_btn(event)
+        self.Pressed_Mouse=None
+        self.Mouse_Press_Loc=[]
 
 
 
@@ -264,13 +320,7 @@ class Img(QLabel):
         #self.resize(new_width,new_height)
         self.__Display_Img(self.Displayed_Img,self.Scale_Factor)
 
-    def mouseMoveEvent(self,mE):
-        pos=get_mouse_pos(mE)
-        mes="Image Pointer (x:%s y:%s) |Scale: %s" %(str(pos[0]),str(pos[1]),str(self.Scale_Factor))
-        t=self.parentWidget()
-        while not t.parentWidget() is None:
-            t=t.parentWidget()
-        t.statusbar.showMessage("Ready "+ mes)
+    
 
 class LabeledImg(QFrame):
     def __init__(self,Filename,*args,**kwargs):
@@ -297,6 +347,7 @@ class Img_Block(QFrame):
         BG='background.tif'
         self.WB=LabeledImg(WB,self)
         self.BG=LabeledImg(BG,self)
+        self.BG.Img.Action_Type="BKGD"
 
         hv.addWidget(self.WB)
         hv.addWidget(self.BG)

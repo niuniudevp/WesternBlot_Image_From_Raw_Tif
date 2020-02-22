@@ -42,10 +42,10 @@ def mapped_points_with_scale_factor(points,scale_factor):
 def get_mouse_pos(mE):
     '''
     获取鼠标的位置
+    x,y=get_mouse_pos(mE)
     '''
-    n = mE.button()
     t=mE.localPos()
-    return t.x(),t.y()
+    return int(t.x()),int(t.y())
 
 def get_mouse_btn(mouse_event):
     '''
@@ -89,7 +89,7 @@ def Get_Super_Parent(widget):
     """
     获取顶层Widget
     """
-    t=self.parentWidget()
+    t=widget.parentWidget()
     while not t.parentWidget() is None:
         t=t.parentWidget()
     return t
@@ -101,4 +101,15 @@ def Get_Pressed_Key(widget):
 
     UI=Get_Super_Parent(widget)
     return UI.PressedKey
+
+def Rect_From_Two_Point(p1,p2):
+    """
+    根据给定的点返回以这两个点为对角线的矩形坐标
+    x,y,w,h=Rect_from_two_point
+    """
+    LT_x=min(p1[0],p2[0])
+    LT_y=min(p1[1],p2[1])
+    w=abs(p1[0]-p2[0])
+    h=abs(p1[1]-p2[1])
+    return LT_x,LT_y,w,h
 
