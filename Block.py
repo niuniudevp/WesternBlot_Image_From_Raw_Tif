@@ -151,21 +151,28 @@ class Indicator(QLabel):
     def __int__(self,*args,**kwargs):
         QLabel.__init__(self,*args,**kwargs)
         self.Fill=False ##是否填充
-        self.setText("AA")
-        self.setStyleSheet("border: 2px solid red")
-        #self.resize(0,0)
-        self.move(10,10)
+        self.Focus_Point=None
+        self.Fcs=False
 
     def mouseMoveEvent(self,event):
         print("Moving")
+        x,y=get_mouse_pos(event)
+        move_x=x-self.Focus_Point[0]
+        move_y=y-self.Focus_Point[1]
+        self.move(self.x()+move_x,self.y()+move_y)
+        
+
         QLabel.mouseMoveEvent(self,event)
 
     def mousePressEvent(self,event):
         print("press_down")
         btn=get_mouse_btn(event)
+        x,y=get_mouse_pos(event)
         if btn=='LEFT':
+            self.Focus_Point=[x,y]
             self.setCursor(Qt.ClosedHandCursor)
-        QLabel.mousePressEvent(self,event)
+            self.setStyleSheet("border:2px solid green")
+
     
     def mouseReleaseEvent(self,event):
         ###在Fill情况下当右键按下抬起后删除点击的box###
@@ -174,8 +181,19 @@ class Indicator(QLabel):
         if self.Fill:
             self.setGeometry(0,0,0,0)
             self.setStyleSheet("")
+        
+        if self.isFocused:
+            self.isFocused=False
+            self.setStyleSheet("border:1px solid blue")
+        else:
+            self.isFocused=True
+            self.setStyleSheet("border:2px solid green")
+
         print("relase")
+        self.Focus_Point=None
         self.setCursor(Qt.ArrowCursor)
+        self.setStyleSheet("border:1px solid blue")
+
         QLabel.mouseReleaseEvent(self,event)
 
 
@@ -197,16 +215,12 @@ class Img(QLabel):
         self.Pressed_Mouse=None
         self.Mouse_Press_Loc=[]
         #self.Indicator_LayOut=QHBoxLayout(self)
-        
-        self.Test=QLabel(self)
         self.__Init_UI(Filename)
 
     def __Init_UI(self,Filename):
         self.__Load_Img(Filename)
         self.__Display_Img(self.Src_Img)
         self.setStyleSheet("border: 2px solid red")
-        self.Test.setStyleSheet("border:1px solid red")
-        self.Test.resize(100,100)
     
     def __Load_Img(self,Filename):
         Cv_Img=cv2.imread(Filename)
