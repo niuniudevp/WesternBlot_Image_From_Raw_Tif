@@ -144,33 +144,328 @@ class ToolBar(QFrame):
         self.setLayout(Hv)
 
 
-class Indicator(QLabel):
+class Reference_Line(QFrame):
+    """
+    竖直和水平参考线
+    """
+    def __init__(self,Type,Position,*args,**kwargs):
+        """
+        Type:参考线的类型 H:水平,V:竖直
+        Position:添加的位置 H的时候是y位置,V的时候是x的位置
+        """
+        QFrame.__init__(self,*args,**kwargs)
+        self.Type=Type
+        self.Color='green'
+        self.Position=Position
+        self.Label=MyLabel(self.Type,self)
+        self.Label.Can_Move_with_Mouse=True
+        self.Label.Anchor_In_Parent=True
+        self.Line=QFrame(self)
+        self.Update_Appearance()
+
+    
+    def Update_Appearance(self):
+        self.Label.setStyleSheet("color:white;background:"+self.Color)
+        self.Label.setMinimumSize(40,20)
+        self.Label.setAlignment(Qt.AlignHCenter)
+         
+        if self.Type=="H":
+            self.resize(self.parentWidget().width(),self.height())
+            self.Line.setStyleSheet("border: 2px solid "+self.Color)
+            self.Line.resize(self.parentWidget().width(),2)
+            self.move(0,self.Position)
+        if self.Type=="V":
+            self.resize(self.width(),self.parentWidget().height())
+            self.Line.setStyleSheet("color:white;border: 2px solid "+self.Color)
+            self.Line.resize(2,self.parentWidget().height())
+            self.move(self.Position,0)
+
+        
+
+class MyLabel(QLabel):
+    """
+    ##重写QLabel
+    可以鼠标move,可以鼠标调整大小,可以Arrow move
+    左键激活,邮件取消激活
+    """
+    def __init__(self,*args,**kwargs):
+        QLabel.__init__(self,*args,**kwargs)
+        ###定义功能块
+        self.setMouseTracking(True)
+        self.Can_Move_with_Mouse=False #可以使用鼠标
+        self.Only_Move_H=False #仅仅可以沿着X移动
+        self.Only_Move_V=False #仅仅可以沿着y移动
+        self.Can_move_with_Arrow_Key=False # 可以使用键盘上下左右移动 
+        self.Can_Adjust_Edge=False #可以通过鼠标调整边缘
+        self.Can_Set_Cursor=False #可以设置鼠标形状
+        self.Can_Action_Change_Style=False #可以根据动作改变Style
+        self.Anchor_In_Parent=False # 设置是否在父控件中相对固定,即移动父控件
+        self.Listen_Key=[] #监听的Key
+        self.Mouse_Press_Btn=None
+        self.clearFocus()
+    
+    def mousePressEvent(self,event):
+
+        btn,(x,y)=Get_Mouse_Parameter(event)
+        #print("Mouse_Pressed "+btn)
+        self.Mouse_Press_Point=(x,y)
+        self.Mouse_Press_Btn=btn
+        if self.Can_move_with_Arrow_Key and not self.hasFocus():
+            #pass
+            #self.OldStyle=self.styleSheet()
+            self.setFocus()
+            #self.setStyleSheet("border:2px solid green")
+
+        if self.Can_Adjust_Edge:
+            L,T,R,B=Get_Mouse_Edge_Status(self,(x,y))
+            if self.Can_Move_with_Mouse:
+                Set_Mouse_Cursor(self,[L,T,R,B],Qt.ClosedHandCursor)
+            else:
+                Set_Mouse_Cursor(self,[L,T,R,B],Qt.ArrowCursor)
+        else:
+            if self.Can_Move_with_Mouse:
+                self.setCursor(Qt.ClosedHandCursor)
+
+       
+    def mouseMoveEvent(self,event):
+        _,(x,y)=Get_Mouse_Parameter(event)
+        #print("" + "Mouse_Moved")
+        L,T,R,B=Get_Mouse_Edge_Status(self,(x,y))
+        #左键移动
+        
+        if self.Mouse_Press_Btn=="LEFT":
+            move_x=x-self.Mouse_Press_Point[0]
+            move_y=y-self.Mouse_Press_Point[1]
+            if self.Only_Move_V:
+                move_x=0
+                self.Can_Adjust_Edge=False
+            if self.Only_Move_H:
+                move_y=0
+                self.Can_Adjust_Edge=False
+
+
+        if self.Can_Adjust_Edge:
+
+            def Edge_Action(x,y):
+                if sum([L,T,R,B]):
+                    ###边缘Move
+                    ori_w=self.width()
+                    ori_h=self.height()
+                    loc_x=self.x()
+                    loc_y=self.y()
+
+                    if L:
+                        #x改变,y不变,w改变,h不变
+                        fixed_p=(loc_x+ori_w,loc_y+ori_h)
+                        TL=(loc_x+move_x,loc_y)
+                        x,y,w,h=Rect_From_Two_Point(TL,fixed_p)
+                    if T:
+                        #x不变,y变,w不变,h变
+                        fixed_p=(loc_x+ori_w,loc_y+ori_h)
+                        TL=(loc_x,loc_y+move_y)
+                        x,y,w,h=Rect_From_Two_Point(TL,fixed_p)
+                    if R:
+                        #x不变,y不变,w改变,h不变
+                        p_l_distance=x-ori_w
+                        fixed_p=(loc_x,loc_y)
+                        TL=(loc_x+x,loc_y+ori_h)
+                        x,y,w,h=Rect_From_Two_Point(TL,fixed_p)
+                    if B:
+                        #x不变,y不变,w不变,h变
+                        p_l_distance=ori_h-y
+                        fixed_p=(loc_x,loc_y)
+                        TL=(loc_x+ori_w,y+loc_y)
+                        x,y,w,h=Rect_From_Two_Point(TL,fixed_p)
+                    self.setGeometry(x,y,w,h)
+
+            if self.Can_Move_with_Mouse:                
+                if self.Mouse_Press_Btn=="LEFT":
+                    Set_Mouse_Cursor(self,[L,T,R,B],Qt.ClosedHandCursor)
+                    if sum([L,T,R,B]):
+                        Edge_Action(x,y)
+                    else:
+                        if self.Anchor_In_Parent:
+                            p=self.parentWidget()
+                            p.move(p.x()+move_x,p.y()+move_y)
+                        else:
+                            self.move(self.x()+move_x,self.y()+move_y)
+                else:
+                    Set_Mouse_Cursor(self,[L,T,R,B],Qt.SizeAllCursor)
+            else:
+                Set_Mouse_Cursor(self,[L,T,R,B],Qt.ArrowCursor)
+                if self.Mouse_Press_Btn=="LEFT":
+                    Edge_Action(x,y)
+        else:
+            if self.Can_Move_with_Mouse:
+                self.setCursor(Qt.SizeAllCursor)
+                if self.Mouse_Press_Btn=="LEFT":
+                    if self.Anchor_In_Parent:
+                        p=self.parentWidget()
+                        p.move(p.x()+move_x,p.y()+move_y)
+                    else:
+                        self.move(self.x()+move_x,self.y()+move_y)
+            else:
+                self.setCursor(Qt.ArrowCursor)
+
+    
+    def mouseReleaseEvent(self,event):
+        #print("Mouse_Released")
+        btn,(x,y)=Get_Mouse_Parameter(event)
+        self.Mouse_Release_Point=(x,y)
+        self.Mouse_Release_Btn=btn
+        self.Mouse_Press_Btn=None
+        self.setCursor(Qt.ArrowCursor)
+
+        if self.Can_move_with_Arrow_Key and btn=="RIGHT":
+            #self.clearFocus()
+            pass
+
+    def keyPressEvent(self,event):
+        #print("Key_Pressed")
+        self.PressedKey=event.key()
+        ###如果监听键盘移动事件
+        if self.Can_move_with_Arrow_Key:
+            Action_keys=[Qt.Key_Right,Qt.Key_Left,Qt.Key_Up,Qt.Key_Down]
+            Action=[
+                [1,0],
+                [-1,0],
+                [0,-1],
+                [0,1]
+            ]
+            if self.Only_Move_H:
+                Action[2:4]=[[0,0],[0,0]]
+            if self.Only_Move_V:
+                Action[0:2]=[[0,0],[0,0]]
+            if self.PressedKey in Action_keys:
+                I=Action_keys.index(self.PressedKey)
+                dx,dy=Action[I]
+                self.move(self.x()+dx,self.y()+dy)
+
+    def keyReleaseEvent(self,event):
+        #print("KeyReleased!")
+        self.PressedKey=None
+        if event.key()==Qt.Key_Delete:
+            self.setVisible(False)
+            
+
+    def focusInEvent(self,event):
+        #print("Focus In")
+        self.OldStyle=self.styleSheet()
+        self.setStyleSheet("border:2px solid green")
+ 
+    def focusOutEvent(self,event):
+        #print("Focus Out")
+        self.setStyleSheet(self.OldStyle)
+
+    
+class Indicator(MyLabel):
+    def __init__(self,Type,*args,**kwargs):
+        MyLabel.__init__(self,*args,**kwargs)
+        self.Can_Move_with_Mouse=True
+        self.Can_move_with_Arrow_Key=True
+        if Type=="WB": 
+            self.Can_Adjust_Edge=True
+        self.Type=Type
+        self.show()
+
+
+
+
+
+
+
+class Indicators(QLabel):
     """
     区域指示器
     """
-    def __int__(self,*args,**kwargs):
+    def __init__(self,*args,**kwargs):
         QLabel.__init__(self,*args,**kwargs)
+        self.setMouseTracking(True)
         self.Fill=False ##是否填充
-        self.Focus_Point=None
-        self.Fcs=False
+        self.Press_Point=None
+        self.Focused=False
+        self.show()
+    
+    def Set_Active(self):
+        UI=Get_Super_Parent(self)
+        Inds=UI.findChildren(Indicator)
+        for i in Inds:
+            i.Set_Disactive()
+        self.Focused=True
+        UI.Active_Indicator=self
+        self.setStyleSheet("border:2px solid green")
+
+    def Set_Disactive(self):
+        UI=Get_Super_Parent(self)
+        self.Focused=False
+        UI.Active_Indicator=None
+        self.setStyleSheet("border:2px solid red")
+
 
     def mouseMoveEvent(self,event):
         print("Moving")
+        print(self.__dict__)
         x,y=get_mouse_pos(event)
-        move_x=x-self.Focus_Point[0]
-        move_y=y-self.Focus_Point[1]
-        self.move(self.x()+move_x,self.y()+move_y)
+        L,T,R,B=Get_Mouse_Edge_Status(self,(x,y))
+        ###如果激活的时候根据鼠标位置设置鼠标形状
+        if self.Focused:
+            Set_Mouse_Cursor(self,[L,T,R,B])
+        
+        if self.Press_Point  and not self.Fill:
+            ##移动改变情况
+            move_x=x-self.Press_Point[0]
+            move_y=y-self.Press_Point[1]
+
+            if sum([L,T,R,B])  and not self.Fill:
+                ###边缘Move
+                ori_w=self.width()
+                ori_h=self.height()
+                loc_x=self.x()
+                loc_y=self.y()
+                
+                if L:
+                    #x改变,y不变,w改变,h不变
+                    fixed_p=(loc_x+ori_w,loc_y+ori_h)
+                    TL=(loc_x+move_x,loc_y)
+                    x,y,w,h=Rect_From_Two_Point(TL,fixed_p)
+                if T:
+                    #x不变,y变,w不变,h变
+                    fixed_p=(loc_x+ori_w,loc_y+ori_h)
+                    TL=(loc_x,loc_y+move_y)
+                    x,y,w,h=Rect_From_Two_Point(TL,fixed_p)
+                if R:
+                    #x不变,y不变,w改变,h不变
+                    p_l_distance=ori_w-x
+                    fixed_p=(loc_x,loc_y)
+                    TL=(loc_x+x-p_l_distance,loc_y+ori_h)
+                    x,y,w,h=Rect_From_Two_Point(TL,fixed_p)
+                if B:
+                    #x不变,y不变,w不变,h变
+                    p_l_distance=ori_h-y
+                    fixed_p=(loc_x,loc_y)
+                    TL=(loc_x+ori_w,y-p_l_distance+loc_y)
+                    x,y,w,h=Rect_From_Two_Point(TL,fixed_p)
+                self.setGeometry(x,y,w,h)
+
+            else:
+                ###整体位置Move
+                self.move(self.x()+move_x,self.y()+move_y)
+                self.setCursor(Qt.ClosedHandCursor)
+            self.Focused=False
         
 
-        QLabel.mouseMoveEvent(self,event)
+        #QLabel.mouseMoveEvent(self,event)
+
 
     def mousePressEvent(self,event):
         print("press_down")
         btn=get_mouse_btn(event)
         x,y=get_mouse_pos(event)
         if btn=='LEFT':
-            self.Focus_Point=[x,y]
-            self.setCursor(Qt.ClosedHandCursor)
+            Edge=Get_Mouse_Edge_Status(self,(x,y))
+            if not sum(Edge):
+                self.setCursor(Qt.ClosedHandCursor)
+            self.Press_Point=[x,y]
             self.setStyleSheet("border:2px solid green")
 
     
@@ -178,24 +473,20 @@ class Indicator(QLabel):
         ###在Fill情况下当右键按下抬起后删除点击的box###
         btn=get_mouse_btn(event)
         x,y=get_mouse_pos(event)
-        if self.Fill:
+        if btn=="RIGHT":
             self.setGeometry(0,0,0,0)
             self.setStyleSheet("")
         
-        if self.isFocused:
-            self.isFocused=False
-            self.setStyleSheet("border:1px solid blue")
+        if self.Focused:
+            self.Set_Disactive()
         else:
-            self.isFocused=True
-            self.setStyleSheet("border:2px solid green")
+            self.Set_Active()
 
         print("relase")
-        self.Focus_Point=None
+        self.Press_Point=None
         self.setCursor(Qt.ArrowCursor)
-        self.setStyleSheet("border:1px solid blue")
-
+        #self.setStyleSheet("border:1px solid blue")
         QLabel.mouseReleaseEvent(self,event)
-
 
 
 
@@ -214,7 +505,6 @@ class Img(QLabel):
         self.setAlignment(Qt.AlignTop|Qt.AlignLeft)
         self.Pressed_Mouse=None
         self.Mouse_Press_Loc=[]
-        #self.Indicator_LayOut=QHBoxLayout(self)
         self.__Init_UI(Filename)
 
     def __Init_UI(self,Filename):
@@ -234,28 +524,25 @@ class Img(QLabel):
         self.setPixmap(QPix)
         self.Displayed_Img=CV_Img
     
-
-
     def mousePressEvent(self,event):
-        btn=get_mouse_btn(event)
-        x,y=get_mouse_pos(event)
+        btn,(x,y)=Get_Mouse_Parameter(event)
         self.Pressed_Mouse=btn
-        self.Mouse_Press_Loc=[x,y]
+        self.Mouse_Press_Loc=(x,y)
+        self.setFocus()
 
         if btn=="LEFT" and self.Action_Type=='WB':
             print("WB_LEFT")
             if self.Box:
                 indicator=self.Box[0]
+                if not indicator.isVisible():
+                    indicator.setGeometry(x,y,0,0)
+                    indicator.setVisible(True)
             else:
                 #需要新建
-                indicator=Indicator(self)
-                indicator.Fill=False
-                indicator.show()#更新后才会显示出来
+                indicator=Indicator("WB",self)
                 self.Box.append(indicator)
-                #self.Indicator_LayOut.addWidget(indicator)
-            
-            indicator.setStyleSheet("border:1px solid blue")
-            indicator.setGeometry(x,y,0,0)
+                indicator.setStyleSheet("border:2px solid red")
+                indicator.setGeometry(x,y,0,0)
                     
         if btn=="LEFT" and self.Action_Type=='BKGD':
             print("BKGD_LEFT")
@@ -263,54 +550,43 @@ class Img(QLabel):
             PressedBtn=Get_Pressed_Key(self)
             ###Box是空的时候直接添加
             if not self.Box:
-                indicator=Indicator(self)
-                indicator.Fill=True
-                indicator.show()
+                indicator=Indicator(self.Action_Type,self)
                 self.Box.append(indicator)  
             else:
-                if PressedBtn==Qt.Key_Control:
+                visible_count=sum([i.isVisible() for i in self.Box])
+                if PressedBtn==Qt.Key_Control or visible_count==0:
                     if 0<len(self.Box)<self.Allowed_Box_Num:
                         ##遍历box看有没有没有用的##
                         for b in self.Box:
-                            if b.width()==0:
+                            if not b.isVisible():
                                 indicator=b
+                                indicator.setVisible(True)
                                 break
                         
                         #如果遍历后还是没有
                         if not indicator:
-                            indicator=Indicator(self)
-                            indicator.Fill=True
-                            indicator.show()
+                            indicator=Indicator(self.Action_Type,self)
                             self.Box.append(indicator)
-                            #self.Indicator_LayOut.addWidget(indicator)
                     
                     else:
                         print("Box is Full")
-                        ###indicator 依然是None
-                
-                else:
-                    ###不按着Ctrl的时候隐藏所有Box,返回第一个box####
-                    for box in self.Box:
-                        box.setGeometry(0,0,0,0)
-                        box.setStyleSheet("")
-                    indicator=self.Box[0]
-            
+                        ###indicator 依然是None        
             ###
-            Marker_w=40
-            Marker_h=10
+            Marker_w=80
+            Marker_h=20
             ###
             if indicator:
-                indicator.setStyleSheet("background:green")
+                indicator.setVisible(True)
+                indicator.setStyleSheet("border:2px solid red")
                 indicator.setGeometry(x-Marker_w/2,y-Marker_h/2,Marker_w,Marker_h)
     
     def mouseMoveEvent(self,mE):
-        x,y=get_mouse_pos(mE)
-        btn=get_mouse_btn(mE)
+        btn,(x,y)=Get_Mouse_Parameter(mE)
         mes="Image Pointer (x:%s y:%s) |Scale: %s" %(str(x),str(y),str(self.Scale_Factor))
         t=Get_Super_Parent(self)
         t.statusbar.showMessage("Ready "+ mes)
     
-        #移动的时候一直按着左键
+        #鼠标画框
         if self.Action_Type=="WB" and self.Pressed_Mouse=="LEFT":
             indicator=self.Box[0]
             x,y,w,h=Rect_From_Two_Point(self.Mouse_Press_Loc,[x,y])
@@ -362,14 +638,21 @@ class Img_Block(QFrame):
         self.WB=LabeledImg(WB,self)
         self.BG=LabeledImg(BG,self)
         self.BG.Img.Action_Type="BKGD"
+        self.BG.Img.Allowed_Box_Num=5
+
 
         hv.addWidget(self.WB)
         hv.addWidget(self.BG)
         hv.setSpacing(20)
         self.AutoreSize()
+        Img=self.WB.Img
+        Ln=Reference_Line("H",200,Img)
+        Ln.Label.Only_Move_V=True
+        Ln.Update_Appearance()
     
     def AutoreSize(self):
         UI=self.parentWidget()
         self.setGeometry(10,100,UI.width()-20,UI.height()-300)
+    
 
 

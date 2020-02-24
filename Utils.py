@@ -60,6 +60,14 @@ def get_mouse_btn(mouse_event):
         return 'MID'
     return None
 
+def Get_Mouse_Parameter(mouse_event):
+    """
+    获取鼠标的按钮和位置
+    btn,(x,y)=Get_Mouse_Parameter(event)
+    """
+    btn=get_mouse_btn(mouse_event)
+    x,y=get_mouse_pos(mouse_event)
+    return btn,(x,y)
 
 RUN_ON_CHANGE="RUN_ON_CHANGE"
 def FUNC_RUN_ON_CHANGE(widgets):
@@ -112,4 +120,39 @@ def Rect_From_Two_Point(p1,p2):
     w=abs(p1[0]-p2[0])
     h=abs(p1[1]-p2[1])
     return LT_x,LT_y,w,h
+
+
+
+def Get_Mouse_Edge_Status(widget,point,Tolerance=12):
+    """
+    获取鼠标在widget内部是否靠近边框的状态
+    [L,T,R,B]=Get_Mouse_Edge_Status
+    """
+    p0=point[0]
+    p1=point[1]
+    x1=widget.width()
+    y1=widget.height()
+    L,T,R,B=p0,p1,p0-x1,p1-y1
+    L,T,R,B=[abs(i)<Tolerance for i in [L,T,R,B]]
+    #print([L,T,R,B])
+    return [L,T,R,B]
+
+def Set_Mouse_Cursor(widget,Edge_array,default=Qt.ArrowCursor):
+    """
+    根据鼠标在widget内部的边框状态设置鼠标形状
+    Edge_array 四个方向的状态
+    default 四个方向都是False的情况
+    return None
+    """
+    Cases=Edge_array
+    Cursor=[Qt.SizeHorCursor,Qt.SizeVerCursor,Qt.SizeHorCursor,Qt.SizeVerCursor]
+    print(Edge_array)
+    if sum(Cases):
+        for i in range(len(Cases)):
+            if Cases[i]:
+                widget.setCursor(Cursor[i])
+    else:
+        widget.setCursor(default)
+
+
 
