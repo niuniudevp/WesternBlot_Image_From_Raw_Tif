@@ -13,7 +13,7 @@ def get_marker_pos(midpos):
 
         Result:
 
-        """
+    """
     w = 150
     h = 30
     w = w if w % 2 else w + 1
@@ -33,7 +33,7 @@ def mapped_points_with_scale_factor(points, scale_factor):
     tp = type(points)
     ret = []
     for i in points:
-        if type(i) == int:
+        if type(i) == int or type(i) == float:
             # 四舍五入取最近的整数
             i_n = int(round(i * scale_factor))
         else:

@@ -30,7 +30,7 @@ class UI(QMainWindow):
         #self.Test()
         self.Main()
         print("SS")
-        hierarchy(self)
+        #hierarchy(self)
 
     def mousePressEvent(self, event):
         print("UI click!")
@@ -92,6 +92,17 @@ class UI(QMainWindow):
         toobar.addWidget(self.Tb)
         toobar.move(0, 0)
         self.ImgB = Img_Block(self)
+        self.ImgB.WB.Syncing.connect(self.Syncing_Imgb_to_Tb)
+        self.Tb.Changed.connect(self.Syncing_Tb_to_Imgb)
+    #@Sig_log
+    def Syncing_Imgb_to_Tb(self):
+        print("GuI Start Syncing Imgb to Tb")
+        self.Tb.Syncing([self.ImgB])
+        print("Gui End")
+    #@Sig_log
+    def Syncing_Tb_to_Imgb(self):
+        print("GUI Syncing Tb to Imgb")
+        self.ImgB.Sync_from_toobar(self.Tb)
 
 
 class Demo(QLabel):
