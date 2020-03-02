@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import QMainWindow, QLabel
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap,QTransform,QImage
+
 from Block import *
 from Utils import FUNC_RUN_ON_CHANGE, RUN_ON_CHANGE
 
@@ -19,14 +20,6 @@ class UI(QMainWindow):
         self.PressedKey = None
         self.Active_Indicator = None
 
-        #Ls.setGeometry(0,0,260,60)
-
-        #self.ImgB.setGeometry(0,60,1000,600)
-        #Hv=QHBoxLayout(self)
-        #Hv.addWidget(Tb)
-        #Hv.addWidget(ImgB)
-        #self.setLayout(Hv)
-        #print("SS")
         #self.Test()
         self.Main()
         print("SS")
@@ -61,43 +54,44 @@ class UI(QMainWindow):
         QMainWindow.keyReleaseEvent(self, event)
 
     def resizeEvent(self, event):
-        #pass
-        self.ImgB.AutoreSize()
+        pass
+        #self.ImgB.AutoreSize()
+        #self.Pre.setGeometry(10, self.ImgB.y()+ self.ImgB.height() + 10 , self.width() - 20, 150)
 
     def universe_func(self, X=None):
         print("UNIVERSE_Working!")
 
     def Test(self):
-        RL = Reference_Line('H', 200, self)
-        RL.Label.Only_Move_V = True
+        self.D=Demo(self)
 
-        VL = Reference_Line('V', 200, self)
-        VL.Label.Only_Move_H = True
-        VL.Color = 'red'
-        VL.Appearance()
-
-        ML = MyLabel('AAAAAA', self)
-        ML.resize(100, 100)
-        #ML.setText('ABCD')
-        ML.Can_Move_with_Mouse = True
-        ML.Can_move_with_Arrow_Key = True
-        ML.Can_Adjust_Edge = True
-        ML.Only_Move_H = True
-
-        ML.setStyleSheet("border:2px solid red")
 
     def Main(self):
         self.Tb = ToolBar(self)
         toobar = self.addToolBar("gongju")
         toobar.addWidget(self.Tb)
-        toobar.move(0, 0)
+        #toobar.move(0, 0)
         self.ImgB = Img_Block(self)
-        self.ImgB.WB.Syncing.connect(self.Syncing_Imgb_to_Tb)
+        self.Pre = PreView_Img(self)
+        #self.Pre.setGeometry(10,self.ImgB.y()+self.ImgB.height()+10,self.width()-20,100)
+        #self.ImgB.WB.Syncing.connect(self.Syncing_Imgb_to_Tb)
+        #self.move()
+        layout=QGridLayout()
+        layout.addWidget(toobar,0,0)
+        layout.addWidget(self.ImgB,1,0)
+        layout.addWidget(self.Pre,2,0)
+        layout.setRowStretch(1,6)
+        layout.setRowStretch(2,3)
+        self.setLayout(layout)
+        self.ImgB.WB.Img.Changed_Signal.connect(lambda : print("Img Change Fired!"))
+        self.ImgB.WB.Img.Indicator_Change_Signal.connect(self.Syncing_Imgb_to_Tb)
+        self.ImgB.WB.Img.Indicator_Change_Signal.connect(lambda : self.Pre.Sync_From([self.ImgB]))
+        self.ImgB.BG.Img.Indicator_Change_Signal.connect(lambda : self.Pre.Sync_From([self.ImgB]))
+        
         self.Tb.Changed.connect(self.Syncing_Tb_to_Imgb)
     #@Sig_log
     def Syncing_Imgb_to_Tb(self):
         print("GuI Start Syncing Imgb to Tb")
-        self.Tb.Syncing([self.ImgB])
+        self.Tb.Toolbar_Sync_From_Img_Block([self.ImgB])
         print("Gui End")
     #@Sig_log
     def Syncing_Tb_to_Imgb(self):
@@ -109,23 +103,21 @@ class Demo(QLabel):
     def __init__(self, *args, **kwargs):
         QLabel.__init__(self, *args, **kwargs)
         WB = 'OET.jpeg'
-        self.setScaledContents(True)
-        self.Box = QLabel(self)
-        self.Box.setStyleSheet("border:1px solid red")
-        self.Box.resize(100, 100)
         self.setStyleSheet("border:1px solid blue")
-        self.setGeometry(0, 0, 800, 800)
-        self.setPixmap(QPixmap('OET.jpeg'))
-
-        #self.ui()
-        #self.setText("ABCD")
-
-    def ui(self):
-        wb = 'OET.jpeg'
-        self.setPixmap(QPixmap(wb))
-
-    def mousePressEvent(self, event):
-        pos = event.localPos()
-        x = int(pos.x())
-        y = int(pos.y())
-        self.Box.move(x, y)
+        #self.setGeometry(0, 0, 800, 800)
+        #self.setPixmap(QPixmap('OET.jpeg'))
+        self.setFont(QFont('Arial',20))
+        self.setText("ABCEDF")
+        self.adjustSize()
+        print(self.geometry())
+    
+    def paintEvents(self,event):
+        pt=QPainter()
+        pt.begin(self)
+        pt.setFont(QFont('Arial',20))
+        pt.setPen(QPen(QColor(0,0,0),5))
+        pt.drawText(22,150,'AAVVVFFDD')
+        pt.drawRect(QRect(100,100,100,100))
+        pt.end()
+        self.setFont(QFont('Arial',20))
+        self.setText("ABCEDF")

@@ -1,6 +1,7 @@
 # 各种自定义Widgets
-from PyQt5.QtWidgets import QFrame, QLineEdit, QLabel, QHBoxLayout, QGridLayout, QVBoxLayout, QScrollArea, QInputDialog
-from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
+from PyQt5.QtWidgets import QFrame, QLineEdit, QLabel, QCheckBox, QHBoxLayout, QGridLayout, QVBoxLayout, QScrollArea, QInputDialog
+from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QRect, QRectF
+from PyQt5.QtGui import QFont, QPainter, QColor, QPen
 from Utils import *
 import cv2
 import time
@@ -175,41 +176,47 @@ class ToolBar(QFrame):
         self.Init_UI()
 
     def Init_UI(self):
-        self.Scale = LabeledInPut('Scale:', 0, self)
-        self.Rotation = LabeledInPut('Rotation:', 0, self)
+        self.Rotation = LabeledInPut('Rotation:', 0.00, self)
+        self.Rotation.Set_Mini_value(-90)
+        self.Rotation.Set_Max_value(90)
+        self.Flip_H = QCheckBox('Flap_H', self)
+        self.Flip_V = QCheckBox('Flap_V', self)
         self.Crop = Box('Crop: ', 'xywh', self)
         self.Marker = Box('Marker: ', 'wh', self)
         self.Marker.Input_w.SetText(50)
         self.Marker.Input_h.SetText(20)
         self.Hv = QGridLayout(self)
         self.blk = QLabel('', self)
-        self.Hv.addWidget(self.Scale, 0, 0)
+        v = QVBoxLayout()
+        v.addWidget(self.Flip_H)
+        v.addWidget(self.Flip_V)
         self.Hv.addWidget(self.Rotation, 0, 1)
-        self.Hv.addWidget(self.Crop, 0, 2)
-        self.Hv.addWidget(self.blk, 0, 3)
-        self.Hv.addWidget(self.Marker, 0, 4)
-        self.Hv.setColumnStretch(3, 4)
+        self.Hv.addLayout(v, 0, 2)
+        self.Hv.addWidget(self.Crop, 0, 3)
+        self.Hv.addWidget(self.blk, 0, 4)
+        self.Hv.addWidget(self.Marker, 0, 5)
+        self.Hv.setColumnStretch(4, 2)
         self.setLayout(self.Hv)
         self.Signal_connection()
 
     def Signal_connection(self):
-        self.Scale.Changed_Signal.connect(self.Pack_and_emit_Signal)
-        self.Rotation.Changed_Signal.connect(self.Pack_and_emit_Signal)
-        self.Crop.Changed_Signal.connect(self.Pack_and_emit_Signal)
-        self.Marker.Changed_Signal.connect(self.Pack_and_emit_Signal)
+        self.Rotation.Changed_Signal.connect(self.Toolbar_Send_Signal)
+        self.Flip_H.stateChanged.connect(self.Toolbar_Send_Signal)
+        self.Flip_V.stateChanged.connect(self.Toolbar_Send_Signal)
+        self.Crop.Changed_Signal.connect(self.Toolbar_Send_Signal)
+        self.Marker.Changed_Signal.connect(self.Toolbar_Send_Signal)
 
-    def Pack_and_emit_Signal(self):
+    def Toolbar_Send_Signal(self):
         print("Toolbar send signal!")
         print(self.sender())
         self.Changed.emit()
 
     # 从Img_Block进行同步
     @pyqtSlot(list)
-    def Syncing(self, Imgb):
+    def Toolbar_Sync_From_Img_Block(self, Imgb):
         print("Toolbar Syncing from ImgB")
         Imgb = Imgb[0]
         #Imgb = Img_Block()
-        self.Scale.SetText(Imgb.WB.Img.Scale_Factor)
         self.Rotation.SetText(Imgb.WB.Img.Angle)
         if len(Imgb.WB.Img.Indicator) > 0:
             t = Imgb.WB.Img.Indicator[0]
@@ -267,14 +274,13 @@ class Reference_Line(QFrame):
                                     self.Color)
             self.Line.resize(1, P.height())
             self.move(int(round(self.Position * factor)), -P.y())
-        print(self.Type + " Reference Line Send Move Signal")
+        #print(self.Type + " Reference Line Send Move Signal")
         print(self.sender())
         self.Moved_Signal.emit([self.x(), self.y()])
 
     @pyqtSlot(list)
-    #@Sig_log
-    def Syncing(self, p):
-        print(self.id + " Syncing from Parameter " + str(p))
+    def Refer_Sync_From_Point(self, p):
+        print(self.id + " Syncing from Point " + str(p))
         self.move(p[0], p[1])
 
     def moveEvent(self, event):
@@ -284,9 +290,10 @@ class Reference_Line(QFrame):
             self.Position = int(round(self.x() / self.P_Factor))
         #print(self.id + " Refernce moveevent! Send " +
         #     str([self.x(), self.y()]))
-        print(self.Type + " Reference_Line Send Move Signal")
-        print(self.sender())
-        self.Moved_Signal.emit([self.x(), self.y()])
+        if self.hasFocus():
+            print(self.Type + " Reference_Line Send Move Signal")
+            print(self.sender())
+            self.Moved_Signal.emit([self.x(), self.y()])
 
     def resizeEvents(self, event):
         #print(self.id + " Refernce resizeevent! Send " +
@@ -302,7 +309,7 @@ class MyLabel(QLabel):
     可以鼠标move,可以鼠标调整大小,可以Arrow move
     左键激活,邮件取消激活
     """
-    Changed_Signal = pyqtSignal()
+    Changed_Signal = pyqtSignal(list)
 
     def __init__(self, *args, **kwargs):
         QLabel.__init__(self, *args, **kwargs)
@@ -322,7 +329,7 @@ class MyLabel(QLabel):
         self.clearFocus()
         print("Label send init Signal")
         print(self.sender())
-        self.Changed_Signal.emit()
+        #self.Changed_Signal.emit([self])
 
     def Scaled(self, Scale_Factor):
         """
@@ -339,6 +346,7 @@ class MyLabel(QLabel):
     def Acture_Pos(self):
         """
         返回真实的大小和在图片上的坐标
+        x,y,w,h= Acture_Pos
         """
         x, y, w, h = mapped_points_with_scale_factor(
             [self.x(), self.y(),
@@ -496,7 +504,7 @@ class MyLabel(QLabel):
             ###删除时也发出change信号
             print("MyLabel send delete Signal")
             print(self.sender())
-            self.Changed_Signal.emit()
+            self.Changed_Signal.emit([self])
         QLabel.keyReleaseEvent(self, event)
 
     def focusInEvent(self, event):
@@ -511,25 +519,26 @@ class MyLabel(QLabel):
         QLabel.focusOutEvent(self, event)
 
     def moveEvent(self, event):
-        if self.hasFocus():
-            print(str(self) + " send Move Signal")
-            self.Changed_Signal.emit()
+        print(str(self) + " send Move Signal")
+        self.Changed_Signal.emit([self])
         QLabel.moveEvent(self, event)
 
-    @pyqtSlot()
+    def resizeEvent(self, event):
+        print(str(self) + " send resize signal")
+        self.Changed_Signal.emit([self])
+        QLabel.resizeEvent(self, event)
+
+    def showEvent(self, event):
+        print("show event of %s" % self)
+        self.Changed_Signal.emit([self])
+        QLabel.showEvent(self, event)
+
+    @pyqtSlot(list)
     def Sync_From(self, src):
+        src = src[0]
         x, y, w, h = src.x(), src.y(), src.width(), src.height()
         self.setGeometry(x, y, w, h)
         self.setVisible(src.isVisible())
-
-    def resizeEvents(self, event):
-        self.Scaled(self.Scale_Factor)
-        print(str(self) + " Send Resize Signal")
-        self.Changed_Signal.emit()
-        if self.hasFocus():
-            self.Changed_Signal.emit()
-
-        QLabel.resizeEvent(self, event)
 
 
 class Indicator(MyLabel):
@@ -555,6 +564,7 @@ class Indicator(MyLabel):
                 self.Name.show()
                 self.Attach_Name_Label()
 
+    # 铆定Label
     def Attach_Name_Label(self):
         if self.Name.isVisible():
             x, y, w = self.x(), self.y(), self.width()
@@ -567,7 +577,10 @@ class Img(QLabel):
     自定义Img类
     """
     Changed_Signal = pyqtSignal(list)
-    Indicator_Changes = pyqtSignal(list)
+    # Indicators 添加时候的动作
+    Indicator_Add = pyqtSignal(list)
+    # Indicator 改变时的动作
+    Indicator_Change_Signal = pyqtSignal()
 
     Listen_KEY = Qt.Key_Control
 
@@ -579,6 +592,7 @@ class Img(QLabel):
         self.setMouseTracking(True)
         self.Action_Type = 'WB'
         self.Allowed_Indicator_Num = 1
+        self.FileName = Filename
         self.Indicator = []
         self.Angle = 0
         self.Src_Img = None
@@ -594,26 +608,32 @@ class Img(QLabel):
         self.V_Refer_Line = Reference_Line("V", 300, self)
         self.V_Refer_Line.Label.Only_Move_H = True
         self.Temp_Indicator = []
+        self.Indicator_Add.connect(self.Link_Indicator_Add_to_Change)
 
         self.__Init_UI(Filename)
 
     def __Init_UI(self, Filename):
         self.__Load_Img(Filename)
-        self.Display_Img(self.Src_Img)
+        self.Display_Img()
         # self.setStyleSheet("border: 2px solid red")
 
     def __Load_Img(self, Filename):
         Cv_Img = cv2.imread(Filename)
         self.Src_Img = Cv_Img
-        height, width = Cv_Img.shape[:2]
+
+    def Display_Img(self, Scale_Factor=1, Angle=0, Flap_H=False, Flap_V=False):
+        CV_Img = self.Src_Img
+        QPix, (width, height) = CV_Img_to_QImage(CV_Img, Scale_Factor, Angle,
+                                                 Flap_H, Flap_V)
+        self.Scale_Factor = Scale_Factor
+        self.Angle = Angle
         self.Img_Width = width
         self.Img_Height = height
-
-    def Display_Img(self, CV_Img, Scale_Factor=1):
-        QPix = CV_Img_to_QImage(CV_Img, Scale_Factor)
-        self.Scale_Factor = Scale_Factor
+        self.Flap_H = Flap_H
+        self.Flap_V = Flap_V
         self.setPixmap(QPix)
-        self.Displayed_Img = CV_Img
+        self.Displayed_Img = QPix
+        # Scale Factor 改变的时候也要更新参考线
         self.H_Refer_Line.Update_Appearance()
         self.V_Refer_Line.Update_Appearance()
 
@@ -636,7 +656,9 @@ class Img(QLabel):
                 indicator = Indicator("WB", self)
                 indicator.Scale_Factor = self.Scale_Factor
                 self.Indicator.append(indicator)
-                self.Indicator_Changes.emit(self.Indicator)
+                print(self.Action_Type + " 新建 Indicator 发送信号!")
+                self.Indicator_Add.emit(self.Indicator)
+
                 indicator.setStyleSheet("border:2px solid red")
                 indicator.setGeometry(x, y, 0, 0)
 
@@ -649,7 +671,8 @@ class Img(QLabel):
                 indicator = Indicator(self.Action_Type, self)
                 indicator.Scale_Factor = self.Scale_Factor
                 self.Indicator.append(indicator)
-                self.Indicator_Changes.emit(self.Indicator)
+                print(self.Action_Type + " 新建 Indicator 发送信号!")
+                self.Indicator_Add.emit(self.Indicator)
 
             else:
                 visible_count = sum([i.isVisible() for i in self.Indicator])
@@ -667,7 +690,8 @@ class Img(QLabel):
                             indicator = Indicator(self.Action_Type, self)
                             indicator.Scale_Factor = self.Scale_Factor
                             self.Indicator.append(indicator)
-                            self.Indicator_Changes.emit(self.Indicator)
+                            print(self.Action_Type + " 新建 Indicator 发送信号!")
+                            self.Indicator_Add.emit(self.Indicator)
 
                     else:
                         print("Box is Full")
@@ -682,7 +706,7 @@ class Img(QLabel):
                 indicator.setGeometry(x - Marker_w / 2, y - Marker_h / 2,
                                       Marker_w, Marker_h)
                 indicator.Scale_Factor = self.Scale_Factor
-                print(" Img Send change indicator Signal")
+                #print(" Img Send change indicator Signal")
                 #indicator.Changed_Signal.emit()
 
         QLabel.mousePressEvent(self, event)
@@ -696,7 +720,7 @@ class Img(QLabel):
             indicator = self.Indicator[0]
             x, y, w, h = Rect_From_Two_Point(self.Mouse_Press_Loc, [x, y])
             indicator.setGeometry(x, y, w, h)
-            print("Img 画框 Indicator 改变 Signal")
+            #print("Img 画框 Indicator 改变 Signal")
             #indicator.Changed_Signal.emit()
         QLabel.mouseMoveEvent(self, event)
 
@@ -713,17 +737,27 @@ class Img(QLabel):
                 New_Scale_Factor = F / 100
                 break
         #New_Scale_Factor = round(New_Scale_Factor,2)
-        self.Display_Img(self.Src_Img, New_Scale_Factor)
-        print(self.Action_Type+" resized from " +str(self.Scale_Factor) + " to " +str(New_Scale_Factor))
+        print(self.Action_Type + " Resized from " + str(self.Scale_Factor) +
+              " to " + str(New_Scale_Factor))
+        self.Display_Img(New_Scale_Factor, self.Angle, self.Flap_H,
+                         self.Flap_V)
+
         self.Scale_Factor = New_Scale_Factor
         # Indicator也要缩放
         for i in self.Indicator:
             i.Scaled(self.Scale_Factor)
 
-        print(self.Action_Type + "> Img Resized and Send Signal!")
+        print(self.Action_Type + "> Img Resized and Send Changed Signal!")
+        print(self.sender())
         self.Changed_Signal.emit([self])
+
         self.show_stat_bar_info(event)
+        event.accept()
         QLabel.resizeEvent(self, event)
+
+    def moveEvent(self, event):
+        print(self.Action_Type + " Moved!")
+        QLabel.moveEvent(self, event)
 
     def show_stat_bar_info(self, event):
         x = '-'
@@ -738,25 +772,29 @@ class Img(QLabel):
         t.statusbar.showMessage("Ready " + mes)
 
     @pyqtSlot()
+    def Link_Indicator_Add_to_Change(self):
+        self.Indicator[-1].Changed_Signal.connect(
+            lambda: self.Indicator_Change_Signal.emit())
+
+    @pyqtSlot()
     def Send_Signal(self):
         print(self.Action_Type + " Img Send Change Signal")
         #self.Changed_Signal.emit()
 
-
     @pyqtSlot(list)
-    def Connection_SRC_Indicator_to_Temp(self,src):
-        if len(src.Indicator) > 0:
-            for i in self.Temp_Indicator:
-                i.setVisible(False)
-            SS = [j for j in src if j.isVisible()]
-            for i in range(len(SS)):
-                try:
-                    m = self.Temp_Indicator[i]
-                except IndexError:
-                    m = MyLabel('', self)
-                    SS[i].Changed_Signal.connect(m.Sync_From)
-                    self.Temp_Indicator.append(m)
-
+    def Connection_SRC_Indicator_to_Temp(self, src):
+        print("Indicator Connectioning From %s to %s" % (src, self))
+        #Indicator 添加的时候就会触发Change事件,所以只需要判断两者的长度是否一致,不一致就连接
+        #新建的Indicator和src的最后一个
+        if len(src) > 0 and len(src) > len(self.Temp_Indicator):
+            m = MyLabel('', self)
+            print("连接新建的Indicator")
+            if self.Action_Type == "WB":
+                m.setStyleSheet("background:red")
+            else:
+                m.setStyleSheet("border:2px dashed red")
+            src[-1].Changed_Signal.connect(m.Sync_From)
+            self.Temp_Indicator.append(m)
 
     def Syncing_Indicator_to_Temp(self, src, targ):
         """
@@ -786,12 +824,14 @@ class Img(QLabel):
                     m.setStyleSheet("border:2px dashed red")
 
     @pyqtSlot(list)
-    def ImgSync_From(self,src):
+    def ImgSync_From(self, src):
         src = src[0]
         print("[Img] Syncing " + self.Action_Type + " From " + src.Action_Type)
         self.Scale_Factor = src.Scale_Factor
+        self.Angle = src.Angle
         print("[Img] Syncing # 同步图片")
-        self.Display_Img(self.Displayed_Img, self.Scale_Factor)
+        self.Display_Img(self.Scale_Factor, self.Angle, self.Flap_H,
+                         self.Flap_V)
         #print("[Img] Syncing # 更新自身的Indicators")
         #for i in self.Indicator:
         #    i.Scaled(self.Scale_Factor)
@@ -812,7 +852,7 @@ class MyScrollArea(QScrollArea):
         self.verticalScrollBar().valueChanged.connect(self.Send_Signal)
 
     def __str__(self):
-        return ("Scroll " + self.widget().Action_Type)
+        return ("Scroll_" + self.widget().Action_Type)
 
     def wheelEvent(self, event):
         print(">>>SSS whelled")
@@ -844,13 +884,17 @@ class MyScrollArea(QScrollArea):
             QScrollArea.wheelEvent(self, event)
 
     def Send_Signal(self):
-        print(str(self) + "Scroll Send signal")
+        print(str(self) + " Send signal")
         self.Changed_Signal.emit([self])
 
     @pyqtSlot(list)
     def MyScroollSync_From(self, src):
         src = src[0]
         print("Do Scroll Syncling to " + self.parentWidget().Img.Action_Type)
+        w_w, w_h = src.widget().width(), src.widget().height()
+        print(str(self) + " resized a widgets")
+        self.widget().resize(w_w, w_h)
+
         self.horizontalScrollBar().setMaximum(
             src.horizontalScrollBar().maximum())
         self.horizontalScrollBar().setSliderPosition(
@@ -859,9 +903,6 @@ class MyScrollArea(QScrollArea):
         self.verticalScrollBar().setSliderPosition(
             src.verticalScrollBar().sliderPosition())
         self.Scale_Factor = src.Scale_Factor
-        w_w, w_h = src.widget().width(), src.widget().height()
-        print(str(self) + " resized a widgets")
-        self.widget().resize(w_w, w_h)
 
 
 class LabeledImg(QFrame):
@@ -880,18 +921,23 @@ class LabeledImg(QFrame):
         self.scoller = MyScrollArea(self)
         self.scoller.setWidget(self.Img)
         self.scoller.setWidgetResizable(False)
+
+        self.scoller.Changed_Signal.connect(
+            self.Img.H_Refer_Line.Update_Appearance)
+        self.scoller.Changed_Signal.connect(
+            self.Img.V_Refer_Line.Update_Appearance)
         self.scoller.Changed_Signal.connect(self.Send_Sync_info)
-        self.scoller.Changed_Signal.connect(self.Img.H_Refer_Line.Update_Appearance)
-        self.scoller.Changed_Signal.connect(self.Img.V_Refer_Line.Update_Appearance)
+
+        self.Img.Changed_Signal.connect(self.Send_Sync_info)
+
         self.Label.setAlignment(Qt.AlignHCenter)
         self.Label.setMaximumHeight(30)
         hv = QVBoxLayout(self)
         hv.addWidget(self.Label)
         hv.addWidget(self.scoller)
-        #self.Img.Changed_Signal.connect(self.Send_Sync_info)
 
     def Send_Sync_info(self):
-        print("LabeledImg Send Signal")
+        print(self.FileName + " LabeledImg Send Signal")
         print(self.sender())
         self.Syncing.emit([self])
 
@@ -925,33 +971,226 @@ class Img_Block(QFrame):
         hv.setSpacing(20)
         self.AutoreSize()
         self.Single_Connect()
-    
 
     def Single_Connect(self):
-        ##连接图片
+        # #连接LabeledImg图片
         self.WB.Syncing.connect(self.BG.LabeledImg_Sync)
         self.BG.Syncing.connect(self.WB.LabeledImg_Sync)
+        # 连接Img的Indicators
+        self.WB.Img.Indicator_Add.connect(
+            self.BG.Img.Connection_SRC_Indicator_to_Temp)
+        self.BG.Img.Indicator_Add.connect(
+            self.WB.Img.Connection_SRC_Indicator_to_Temp)
 
     def Sync_from_toobar(self, Tb):
         print("Syncing from Toolbar")
         x, y, w, h = Tb.Crop.Input_x.Value(), Tb.Crop.Input_y.Value(
         ), Tb.Crop.Input_w.Value(), Tb.Crop.Input_h.Value()
         mw, mh = Tb.Marker.Input_w.Value(), Tb.Marker.Input_h.Value()
-        for i in self.WB.Img.Indicator + self.BG.Img.Temp_Indicator:
+        Angle = Tb.Rotation.Value()
+        Flap_H = Tb.Flip_H.isChecked()
+        Flap_V = Tb.Flip_V.isChecked()
+        Scale_Factor = self.WB.Img.Scale_Factor
+        self.WB.Img.Display_Img(Scale_Factor, Angle, Flap_H, Flap_V)
+        self.BG.Img.Display_Img(Scale_Factor, Angle, Flap_H, Flap_V)
+
+        for i in self.WB.Img.Indicator:
             i.Set_Acture_Pos(x, y, w, h)
-        for i in self.BG.Img.Indicator + self.WB.Img.Temp_Indicator:
+        for i in self.BG.Img.Indicator:
             i.Set_Acture_Size(mw, mh)
 
     def AutoreSize(self):
         UI = self.parentWidget()
         self.setGeometry(10, 100, UI.width() - 20, UI.height() - 300)
 
+    def Pack_Info(self):
+        """
+        封装Img信息以供传递
+        返回  dict
+        """
+        info = {}
+        info['filename'] = self.WB.Img.FileName
+        info['rotation'] = self.WB.Img.Angle
+        info['Flap_h'] = self.WB.Img.Flap_H
+        info['Flap_v'] = self.WB.Img.Flap_V
+        info['crop'] = []
+        info['markers'] = []
+        crops = self.WB.Img.Indicator
+        markers = self.BG.Img.Indicator
+        for i in crops:
+            info['crop'].append({'name': i.Name.text(), 'pos': i.Acture_Pos()})
+        for i in markers:
+            info['markers'].append({
+                'name': i.Name.text(),
+                'pos': i.Acture_Pos()
+            })
+        info['src_img'] = self.WB.Img.Src_Img
+        return info
+
     def mousePressEvent(self, event):
         print("Img_Box is clicked")
 
 
-#        print(self.event())
+class PreView_Img(QFrame):
+    def __init__(self, *args, **kwargs):
+        QFrame.__init__(self, *args, **kwargs)
+        self.View_Info = None
+        self.View_Scale = 1
+        self.Add_Border = True
+        self.Info_L_Most = 0
+        self.Info_T_Most = 0
+        self.Info_R_Most = 0
+        self.Info_B_Most = 0
+        self.draw_text = []  #{'text':#,'font':#,'rect':#}
+        self.draw_marker = []  # {'rect':#}
+        self.draw_Img = []  #{'rect':#}
+        self.draw_rec = []  #{'rect':#}
+        self.Temp = QLabel(self)
+        self.setStyleSheet("border:2px solid red")
 
-    def childEvent(self, event):
-        print(event)
-        self.changeEvent
+    def Load_info(self, Info):
+        self.View_Info = Info
+        self.Pre_set()
+        self.Rearange()
+        self.update()
+
+    def Pre_set(self):
+        if 'src_img' not in self.View_Info.keys():
+            self.View_Info['src_img'] = cv2.imread(self.View_Info['filename'])
+
+        self.Gene_Font = QFont('Arial', 20)
+        self.Marker_Font = QFont('Arial', 14)
+
+        ###单独只有一项的时候默认将文字标签放在右边
+        if len(self.View_Info['crop']) > 0 and len(
+                self.View_Info['markers']) > 0:
+            if self.View_Info['crop'][0]['pos'][0] > self.View_Info['markers'][
+                    0]['pos'][0]:
+                self.Postion_Type = 1  # Marker >> Strip >> Gene
+            else:
+                self.Postion_Type = 2  # Gene >> Strip >> Marker
+        else:
+            self.Postion_Type = 0  #默认情况统一放在右边
+
+    def Text_size(self, text, font):
+        """
+        获取 text设置为相应字体时候的大小
+        w,h=Text_size
+        """
+        self.Temp.setVisible(False)
+        self.Temp.setFont(font)
+        self.Temp.setText(text)
+        self.Temp.adjustSize()
+        return self.Temp.width(), self.Temp.height()
+
+    def Rearange(self):
+        self.draw_text = []  #{'text':#,'font':#,'rect':#}
+        self.draw_marker = []  # {'rect':#}
+        self.draw_Img = []  #{'rect':#}
+        self.draw_rec = []  #{'rect':#}
+        for m in self.View_Info['markers']:
+            text_w, text_h = self.Text_size(m['name'], self.Marker_Font)
+            m_x, m_y, m_w, m_h = m['pos']
+            if self.Postion_Type == 1:  # Marker >> Strip >> Gene
+                text_pos = (m_x - text_w - 8, m_y - int(
+                    (text_h - m_h) / 2), text_w, text_h)
+                align = Qt.AlignRight
+            else:
+                text_pos = (m_x + m_w + 8, m_y - int(
+                    (text_h - m_h) / 2), text_w, text_h)
+                align = Qt.AlignLeft
+            self.draw_text.append({
+                'text': m['name'],
+                'font': self.Marker_Font,
+                'rect': text_pos,
+                'align': align
+            })
+            self.draw_marker.append({'rect': m['pos']})
+
+        for c in self.View_Info['crop']:
+            text_w, text_h = self.Text_size(c['name'], self.Gene_Font)
+            m_x, m_y, m_w, m_h = c['pos']
+            if self.Postion_Type == 2:  # Gene >> Strip >> Marker
+                text_pos = (m_x - text_w - 8, m_y - int(
+                    (text_h - m_h) / 2), text_w, text_h)
+                align = Qt.AlignRight
+            else:
+                text_pos = (m_x + m_w + 8, m_y - int(
+                    (text_h - m_h) / 2), text_w, text_h)
+                align = Qt.AlignLeft
+            self.draw_text.append({
+                'text': c['name'],
+                'font': self.Gene_Font,
+                'rect': text_pos,
+                'align': align
+            })
+            self.draw_Img.append({'rect': c['pos']})
+            self.draw_rec.append(
+                {'rect': (m_x - 2, m_y - 2, m_w + 4, m_h + 4)})
+
+        l, t, r, b = [], [], [], []
+        for i in self.draw_marker + self.draw_rec + self.draw_text + self.draw_Img:
+            l.append(i['rect'][0])
+            t.append(i['rect'][1])
+            r.append(i['rect'][0] + i['rect'][2])
+            b.append(i['rect'][1] + i['rect'][3])
+
+        self.Info_L_Most = min(l) - 5 if len(l) > 0 else 0
+        self.Info_T_Most = min(t) - 5 if len(t) > 0 else 0
+        self.Info_R_Most = max(r) if len(r) > 0 else 0
+        self.Info_B_Most = max(b) if len(b) > 0 else 0
+        self.dx = -self.Info_L_Most
+        self.dy = -self.Info_T_Most
+
+    def rect_fix(self, rect):
+        x, y, w, h = rect
+        return x + self.dx, y + self.dy, w, h
+
+    def paintEvent(self, event):
+        print("Patining")
+        pt = QPainter()
+        pt.begin(self)
+
+        # 绘制文字
+        for i in self.draw_text:
+            pt.setPen(QPen(QColor(0, 0, 0), 3))
+            pt.setFont(i['font'])
+            x, y, w, h = self.rect_fix(i['rect'])
+            pt.drawText(QRectF(x, y, w, h), i['align'], i['text'])
+            #pt.drawRect(QRect(x,y,w,h))
+
+        for r in self.draw_rec:
+            x, y, w, h = self.rect_fix(r['rect'])
+            pt.drawRect(QRect(x, y, w, h))
+
+        for m in self.draw_marker:
+            pt.setBrush(QColor(0, 0, 0))
+            x, y, w, h = self.rect_fix(m['rect'])
+            pt.fillRect(x, y, w, h, QColor(0, 0, 0))
+
+        for p in self.draw_Img:
+            im, _ = CV_Img_to_QImage(self.View_Info['src_img'], 1,
+                                     self.View_Info['rotation'],
+                                     self.View_Info['Flap_h'],
+                                     self.View_Info['Flap_v'])
+            x,y,w,h=p['rect']
+            im=im.copy(x,y,w,h)
+            x, y, w, h = self.rect_fix(p['rect'])
+            pt.drawPixmap(x,y,im)
+
+        
+        pt.end()
+    
+    def AutoreSize(self):
+        UI = self.parentWidget()
+        
+
+    @pyqtSlot(list)
+    def Sync_From(self, Imgb):
+        #Img=Img_Block()
+        Img = Imgb[0]
+        info = Img.Pack_Info()
+        print(info)
+        print(self.size())
+        self.Load_info(info)
+        #self.adjustSize()

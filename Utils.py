@@ -1,6 +1,6 @@
 # 基本的功能函数##
 
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtGui import QImage, QPixmap, QTransform
 from PyQt5.QtCore import Qt
 import cv2
 
@@ -86,22 +86,44 @@ def FUNC_RUN_ON_CHANGE(widgets):
         P.__dict__[RUN_ON_CHANGE](P)
 
 
-def CV_Img_to_QImage(CV_Img, Scale_Factor=1):
+def CV_Img_to_QImage(CV_Img,
+                     Scale_Factor=1,
+                     Angle=0,
+                     Flap_H=False,
+                     Flap_V=False):
     '''
     将opencv读取的图片转为QImage类型
-    返回QPixmap,Size
+    返回QPixmap,Rotated_Size
     '''
     height, width = CV_Img.shape[:2]
     currentFrame = cv2.cvtColor(CV_Img, cv2.COLOR_BGR2RGB)
     bytesPerline = 3 * width
     img = QImage(currentFrame, width, height, bytesPerline,
                  QImage.Format_RGB888)
+
+    if Flap_H:
+        # #上下翻转
+        mt = QTransform()
+        mt.setMatrix(1, 0, 0, 0, -1, 0, 0, 0, 1)
+        img = img.transformed(mt)
+
+    if Flap_V:
+        # 左右翻转
+        mt = QTransform()
+        mt.setMatrix(-1, 0, 0, 0, 1, 0, 0, 0, 1)
+        img = img.transformed(mt)
+
+    if Angle != 0:
+        mt = QTransform()
+        mt.rotate(Angle)
+        img = img.transformed(mt)
+
+    width, height = img.width(), img.height()
     Im = QPixmap.fromImage(img)
-    #new_size_w,new_size_h=int(round(width*Scale_Factor)),int(round(height*Scale_Factor))
     new_size_w, new_size_h = mapped_points_with_scale_factor((width, height),
                                                              Scale_Factor)
     Im = Im.scaled(new_size_w, new_size_h, Qt.KeepAspectRatio)
-    return Im
+    return Im, (width, height)
 
 
 def Get_Super_Parent(widget):
