@@ -75,17 +75,6 @@ def Get_Mouse_Parameter(mouse_event):
     return btn, (x, y)
 
 
-RUN_ON_CHANGE = "RUN_ON_CHANGE"
-
-
-def FUNC_RUN_ON_CHANGE(widgets):
-
-    P = widgets.parentWidget()
-    if P and RUN_ON_CHANGE in P.__dict__.keys():
-        print(P)
-        P.__dict__[RUN_ON_CHANGE](P)
-
-
 def CV_Img_to_QImage(CV_Img,
                      Scale_Factor=1,
                      Angle=0,

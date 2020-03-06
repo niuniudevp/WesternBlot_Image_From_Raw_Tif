@@ -1,31 +1,10 @@
 # 各种自定义Widgets
-from PyQt5.QtWidgets import QFrame, QLineEdit, QLabel, QCheckBox, QHBoxLayout, QGridLayout, QVBoxLayout, QScrollArea, QInputDialog
-from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QRect, QRectF
-from PyQt5.QtGui import QFont, QPainter, QColor, QPen
+from PyQt5.QtWidgets import QMainWindow, QDockWidget, QTreeView, QMenu, QAction, QTreeWidget, QListWidget, QAbstractItemView, QTreeWidgetItem, QDirModel, QPushButton, QFrame, QLineEdit, QLabel, QCheckBox, QHBoxLayout, QGridLayout, QVBoxLayout, QScrollArea,QFileDialog , QInputDialog
+from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QRect, QRectF, QSize, QDir
+from PyQt5.QtGui import QFont, QPainter, QColor, QPen, QImage, QCursor, QGuiApplication
 from Utils import *
 import cv2
 import time
-
-#####Signal_log####
-
-
-def Sig_log(func):
-    def warpper(ins, *args, **kwargs):
-        try:
-            print("Class Name " + ins.__class__.__name__)
-            print("Function Name " + sys._getframe().f_code.co_name)
-            print("Sender" + ins.sender())
-        except:
-            pass
-        func(ins, *args, **kwargs)
-        print("End!")
-
-    return warpper
-
-
-class Package():
-    def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
 
 
 class LabeledInPut(QFrame):
@@ -359,8 +338,12 @@ class MyLabel(QLabel):
         self.setGeometry(x, y, w, h)
 
     def Set_Acture_Size(self, w, h):
-        w, h = mapped_points_with_scale_factor([w, h], self.Scale_Factor)
-        self.resize(w, h)
+        n_w, n_h = mapped_points_with_scale_factor([w, h], self.Scale_Factor)
+        ###Keep Centered
+        x, y, w, h = self.x(), self.y(), self.width(), self.height()
+        n_x = x + (w - n_w) / 2
+        n_y = y + (h - n_h) / 2
+        self.setGeometry(n_x, n_y, n_w, n_h)
 
     def mousePressEvent(self, event):
 
@@ -563,6 +546,8 @@ class Indicator(MyLabel):
                 self.Name.setText(text)
                 self.Name.show()
                 self.Attach_Name_Label()
+                print("%s Send text change Signal" % self)
+                self.Changed_Signal.emit([self])
 
     # 铆定Label
     def Attach_Name_Label(self):
@@ -697,8 +682,8 @@ class Img(QLabel):
                         print("Box is Full")
                         # indicator 依然是None
             #
-            Marker_w = 50
-            Marker_h = 20
+            Marker_w = 70
+            Marker_h = 15
             #
             if indicator:
                 indicator.setVisible(True)
@@ -957,19 +942,19 @@ class Img_Block(QFrame):
     Assign two picture
     同步两个图片的设置情况
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, Img_list, *args, **kwargs):
         QFrame.__init__(self, *args, **kwargs)
         hv = QHBoxLayout(self)
-        WB = 'blot.tif'
-        BG = 'background.tif'
+        self.Imgs = Img_list
+        WB = Img_list[0]
+        BG = Img_list[1]
         self.WB = LabeledImg(WB, self)
         self.BG = LabeledImg(BG, self)
         self.BG.Img.Action_Type = "BKGD"
         self.BG.Img.Allowed_Indicator_Num = 5
         hv.addWidget(self.WB)
         hv.addWidget(self.BG)
-        hv.setSpacing(20)
-        self.AutoreSize()
+        self.layout = hv
         self.Single_Connect()
 
     def Single_Connect(self):
@@ -999,10 +984,6 @@ class Img_Block(QFrame):
         for i in self.BG.Img.Indicator:
             i.Set_Acture_Size(mw, mh)
 
-    def AutoreSize(self):
-        UI = self.parentWidget()
-        self.setGeometry(10, 100, UI.width() - 20, UI.height() - 300)
-
     def Pack_Info(self):
         """
         封装Img信息以供传递
@@ -1031,9 +1012,9 @@ class Img_Block(QFrame):
         print("Img_Box is clicked")
 
 
-class PreView_Img(QFrame):
+class PreView_Img(QScrollArea):
     def __init__(self, *args, **kwargs):
-        QFrame.__init__(self, *args, **kwargs)
+        QScrollArea.__init__(self, *args, **kwargs)
         self.View_Info = None
         self.View_Scale = 1
         self.Add_Border = True
@@ -1046,13 +1027,18 @@ class PreView_Img(QFrame):
         self.draw_Img = []  #{'rect':#}
         self.draw_rec = []  #{'rect':#}
         self.Temp = QLabel(self)
-        self.setStyleSheet("border:2px solid red")
+        self.PreView_Img = None
+        self.View = QLabel(self)
+        self.View.setAlignment(Qt.AlignCenter)
+        self.View.setScaledContents(False)
+        self.setWidget(self.View)
+        self.setAlignment(Qt.AlignCenter)
+        self.View.setStyleSheet("border:2px solid red")
 
     def Load_info(self, Info):
         self.View_Info = Info
         self.Pre_set()
         self.Rearange()
-        self.update()
 
     def Pre_set(self):
         if 'src_img' not in self.View_Info.keys():
@@ -1088,19 +1074,24 @@ class PreView_Img(QFrame):
         self.draw_marker = []  # {'rect':#}
         self.draw_Img = []  #{'rect':#}
         self.draw_rec = []  #{'rect':#}
+        self.Spacer = '  '
         for m in self.View_Info['markers']:
-            text_w, text_h = self.Text_size(m['name'], self.Marker_Font)
+            text = m['name']
+            text_w, text_h = self.Text_size(text + self.Spacer,
+                                            self.Marker_Font)
             m_x, m_y, m_w, m_h = m['pos']
             if self.Postion_Type == 1:  # Marker >> Strip >> Gene
                 text_pos = (m_x - text_w - 8, m_y - int(
                     (text_h - m_h) / 2), text_w, text_h)
                 align = Qt.AlignRight
+                text = text + self.Spacer
             else:
                 text_pos = (m_x + m_w + 8, m_y - int(
                     (text_h - m_h) / 2), text_w, text_h)
                 align = Qt.AlignLeft
+                text = self.Spacer + text
             self.draw_text.append({
-                'text': m['name'],
+                'text': text,
                 'font': self.Marker_Font,
                 'rect': text_pos,
                 'align': align
@@ -1108,25 +1099,28 @@ class PreView_Img(QFrame):
             self.draw_marker.append({'rect': m['pos']})
 
         for c in self.View_Info['crop']:
-            text_w, text_h = self.Text_size(c['name'], self.Gene_Font)
+            text = c['name']
+            text_w, text_h = self.Text_size(text + self.Spacer, self.Gene_Font)
             m_x, m_y, m_w, m_h = c['pos']
             if self.Postion_Type == 2:  # Gene >> Strip >> Marker
                 text_pos = (m_x - text_w - 8, m_y - int(
                     (text_h - m_h) / 2), text_w, text_h)
                 align = Qt.AlignRight
+                text = text + self.Spacer
             else:
                 text_pos = (m_x + m_w + 8, m_y - int(
                     (text_h - m_h) / 2), text_w, text_h)
                 align = Qt.AlignLeft
+                text = self.Spacer + text
             self.draw_text.append({
-                'text': c['name'],
+                'text': text,
                 'font': self.Gene_Font,
                 'rect': text_pos,
                 'align': align
             })
             self.draw_Img.append({'rect': c['pos']})
             self.draw_rec.append(
-                {'rect': (m_x - 2, m_y - 2, m_w + 4, m_h + 4)})
+                {'rect': (m_x - 2, m_y - 2, m_w + 3, m_h + 3)})
 
         l, t, r, b = [], [], [], []
         for i in self.draw_marker + self.draw_rec + self.draw_text + self.draw_Img:
@@ -1146,10 +1140,17 @@ class PreView_Img(QFrame):
         x, y, w, h = rect
         return x + self.dx, y + self.dy, w, h
 
-    def paintEvent(self, event):
+    def PreView(self):
         print("Patining")
+
+        Img = QImage(
+            QSize(self.Info_R_Most - self.Info_L_Most + 5,
+                  self.Info_B_Most - self.Info_T_Most + 5),
+            QImage.Format_ARGB32)
+        Img.fill(Qt.transparent)
+        # Img.fill('white')
         pt = QPainter()
-        pt.begin(self)
+        pt.begin(Img)
 
         # 绘制文字
         for i in self.draw_text:
@@ -1173,24 +1174,277 @@ class PreView_Img(QFrame):
                                      self.View_Info['rotation'],
                                      self.View_Info['Flap_h'],
                                      self.View_Info['Flap_v'])
-            x,y,w,h=p['rect']
-            im=im.copy(x,y,w,h)
+            x, y, w, h = p['rect']
+            im = im.copy(x, y, w, h)
             x, y, w, h = self.rect_fix(p['rect'])
-            pt.drawPixmap(x,y,im)
-
-        
+            pt.drawPixmap(x, y, im)
         pt.end()
-    
-    def AutoreSize(self):
-        UI = self.parentWidget()
-        
+        return Img
 
     @pyqtSlot(list)
     def Sync_From(self, Imgb):
-        #Img=Img_Block()
         Img = Imgb[0]
         info = Img.Pack_Info()
-        print(info)
-        print(self.size())
         self.Load_info(info)
-        #self.adjustSize()
+        Img = self.PreView()
+        self.View.setPixmap(QPixmap.fromImage(Img))
+        #print(self.PreView_Img.size())
+        self.View.adjustSize()
+
+
+class Img_Block_Pre(QFrame):
+    """
+    将Img Block 和PreView_Img
+    合并起来
+    """
+    def __init__(self, Img_list, *args, **kwargs):
+        QFrame.__init__(self, *args, **kwargs)
+        # Img_Block
+        self.ImgB = Img_Block(Img_list, self)
+        # Preview
+        self.Pre = PreView_Img(self)
+        self.init_UI()
+        self.Signal_Connection()
+
+    def init_UI(self):
+        Gd = QGridLayout(self)
+        Gd.addWidget(self.ImgB, 0, 0)
+        Gd.addWidget(self.Pre, 1, 0)
+        Gd.setRowStretch(0, 4)
+        Gd.setRowStretch(1, 2)
+        self.setLayout(Gd)
+
+    def Signal_Connection(self):
+        UI = Get_Super_Parent(self)
+        self.ImgB.WB.Img.Changed_Signal.connect(
+            lambda: self.Pre.Sync_From([self.ImgB]))
+        self.ImgB.WB.Img.Indicator_Change_Signal.connect(UI.Syncing_Imgb_to_Tb)
+        self.ImgB.WB.Img.Indicator_Change_Signal.connect(
+            lambda: self.Pre.Sync_From([self.ImgB]))
+        self.ImgB.BG.Img.Indicator_Change_Signal.connect(
+            lambda: self.Pre.Sync_From([self.ImgB]))
+
+"""
+class My_Tree_View(QFrame):
+    def __init__(self, *args, **kwargs):
+        QFrame.__init__(self, *args, **kwargs)
+        self.Current_Path = QDir.home().absolutePath()
+        self.Path_Input = QLineEdit(self)
+        self.Go_Btn = QPushButton('Go', self)
+        self.Go_Btn.clicked.connect(self.Change_Dir)
+        
+        self.Tree.setAnimated(True)
+        self.Tree.setSortingEnabled(True)
+        self.Tree.setAlternatingRowColors(True)
+        Gd = QGridLayout(self)
+        Gd.addWidget(self.Path_Input, 0, 0)
+        self.Path_Input.setMaximumHeight(50)
+        Gd.addWidget(self.Go_Btn, 0, 1)
+        self.Go_Btn.setMaximumHeight(50)
+        Gd.addWidget(self.Tree, 1, 0, 0, 2)
+        Gd.setRowStretch(1, 10)
+        self.setLayout(Gd)
+        self.setStyleSheet("border: 2px solid red")
+
+    def Change_Dir(self):
+        self.Current_Path = self.Path_Input.text()
+        self.Tree.setRootIndex(self.model.index(self.Current_Path))
+
+    def resizeEvent(self, event):
+        #self.Tree.resize(self.Tree.width(), self.height()-50)
+        QFrame.resizeEvent(self, event)
+"""
+
+class My_TreeItem(QTreeWidgetItem):
+    """
+    自定义TreeWidgetItem, 添加右键菜单项目
+    """
+    def __init__(self, *args, **kwargs):
+        QTreeWidgetItem.__init__(self, *args, **kwargs)
+        self.Type = 'WB'
+        self.act_change = QAction('Change')
+        self.act_delete = QAction('Delete')
+
+    def show_menu(self):
+        menu = QMenu()
+        menu.addAction(self.act_change)
+        if self.Type == 'WB':
+            menu.addAction(self.act_delete)
+        menu.exec(QCursor.pos())
+
+
+class Img_Tree(QFrame):
+    """
+    本class实现将加载的dict 转化为列表tree（Wb_Img|_background_img）视图
+    """
+    def __init__(self, img_dict, *args, **kwargs):
+        QFrame.__init__(self, *args, **kwargs)
+        self.Tree = QTreeWidget(self)
+        self.Tree.setDropIndicatorShown(True)
+        self.Tree.setDragEnabled(True)
+        self.Tree.viewport().acceptDrops()
+        self.Tree.setDragDropMode(QAbstractItemView.InternalMove)
+        self.img_dict = img_dict
+        self.Tree.setHeaderHidden(True)
+        self.imgs = []
+        self.init_ui(self.img_dict)
+        self.layout = QVBoxLayout()
+        self.layout.addWidget(self.Tree)
+        self.setLayout(self.layout)
+        
+
+    def init_ui(self, img_dict):
+        if img_dict:
+            for img in img_dict:
+                c = My_TreeItem()
+                c.setText(0, img['wb'])
+                # 设置不可以被Drop
+                c.setFlags(c.flags() & ~Qt.ItemIsDropEnabled)
+                c.act_delete.triggered.connect(self.menu_delete)
+                c.act_change.triggered.connect(self.menu_change)
+
+                cc = My_TreeItem(c)
+                cc.Type = 'BKGD'
+                cc.act_change.triggered.connect(self.menu_change)
+                cc.setText(0, img['bkgd'])
+                # 设置不可以被Drop
+                cc.setFlags(cc.flags() & ~Qt.ItemIsDropEnabled)
+                # 设置不可以被Drag
+                cc.setFlags(cc.flags() & ~ Qt.ItemIsDragEnabled)
+                self.Tree.addTopLevelItem(c)
+                self.imgs.append(c)
+
+    def enable_bottom_btn(self, bool):
+        if bool:
+            self.Add_Btn = QPushButton('Add New', self)
+            self.Add_Btn.clicked.connect(Broswer_Img(self).show)
+            self.layout.addWidget(self.Add_Btn)
+        
+    
+    def enable_contextmenu(self, bool):
+        if bool:
+            self.Tree.itemPressed.connect(self.show_menu)
+
+
+
+    @pyqtSlot(list)
+    def update_img_list(self, new_img_list):
+        self.Tree.clear()
+        self.init_ui(new_img_list)
+
+    # 添加右键菜单事项
+    def show_menu(self, item, int):
+        if (QGuiApplication.mouseButtons() & Qt.RightButton):
+            item.show_menu()
+    
+    # 右键菜单Action响应
+    def menu_delete(self):
+        self.Tree.takeTopLevelItem(self.Tree.currentIndex().row())
+    
+    def menu_change(self):
+        item = self.Tree.currentItem()
+        if item.Type == 'WB':
+            # 调用增加窗口，同时显示WB 和 BKGD
+            pass
+        if item.Type == 'BKGD':
+            # 只显示BKGD
+            pass
+
+
+class Broswer_Img(QMainWindow):
+    """
+    选择图片文件并且预览，自动匹配多图的情况和背景图片
+    """
+    def __init__(self, *args, **kwargs):
+        QMainWindow.__init__(self, *args, **kwargs)
+        self.Current_Dir = QDir.home().absolutePath()
+        self.setWindowTitle("Select Imags")
+        self.setWindowModality(Qt.ApplicationModal)
+        self.Left_Dock_Code()
+        self.Central_Frame_Code()
+        self.Right_Dock_Code()
+        self.setGeometry(200, 200, 800, 500)
+    
+    def Left_Dock_Code(self):
+        self.Left_Frame = QFrame(self)
+        self.Model = QDirModel(self)
+        self.Model.setSorting(QDir.DirsFirst | QDir.IgnoreCase | QDir.Name)
+        self.Model.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs
+                             | QDir.AllEntries)
+        self.Tree = QTreeView(self.Left_Frame)
+        self.Tree.setModel(self.Model)
+        self.Tree.setRootIndex(self.Model.index(self.Current_Dir))
+        #self.Tree.expandAll()
+        self.Dir_Select = QPushButton("Select a Folder", self.Left_Frame)
+        layout = QVBoxLayout()
+        layout.addWidget(self.Tree)
+        layout.addWidget(self.Dir_Select)
+        self.Left_Frame.setLayout(layout)
+        self.Left_Dock = QDockWidget('Broswer Images', self)
+        self.Left_Dock.setWidget(self.Left_Frame)
+        self.Left_Dock.setFeatures(QDockWidget.NoDockWidgetFeatures)
+        self.Dir_Select.clicked.connect(self.dir_selection)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.Left_Dock)
+    
+    def Central_Frame_Code(self):
+        self.Central_Frame = QFrame(self)
+        layout = QGridLayout()
+        self.wb_label = QLabel(self.Central_Frame)
+        self.bkgd_label = QLabel(self.Central_Frame)
+        self.wb_label.setMaximumHeight(30)
+        
+        self.wb = QLabel(self.Central_Frame)
+        self.bkgd = QLabel(self.Central_Frame)
+        
+        self.navigator = QFrame(self.Central_Frame)
+        self.nav_left = QPushButton(self.navigator)
+        self.nav_right = QPushButton(self.navigator)
+        nav_layout = QHBoxLayout()
+        nav_layout.addWidget(self.nav_left)
+        nav_layout.addWidget(self.nav_right)
+        self.navigator.setLayout(nav_layout)
+        self.navigator.setMaximumHeight(40)
+
+        self.btns = QFrame(self.Central_Frame)
+        self.btns.setMaximumHeight(40)
+        self.Btn_Add = QPushButton(self.btns)
+        self.Btn_Close = QPushButton(self.btns)
+        btn_layout = QHBoxLayout()
+        btn_layout.addWidget(self.Btn_Add)
+        btn_layout.addWidget(self.Btn_Close)
+        self.btns.setLayout(btn_layout)
+
+        # 根据具体的传入参数构建不同的视图
+        layout.addWidget(self.wb_label, 0, 0)
+        layout.addWidget(self.bkgd_label, 0, 1)
+        
+        layout.addWidget(self.wb, 1, 0)
+        layout.addWidget(self.bkgd, 1, 1)
+        
+        layout.addWidget(self.navigator, 2, 0)
+        
+        layout.addWidget(self.btns, 3, 0, 2, 0)
+        layouts = QVBoxLayout()
+        layouts.addLayout(layout)
+        self.Central_Frame.setLayout(layouts)
+        self.setCentralWidget(self.Central_Frame)
+        self.setStyleSheet('border:1px solid red')
+
+
+    def Right_Dock_Code(self):
+        files=[{'wb':'AAAAAAAA', 'bkgd':'BBBBB'}, {'wb':'CCCCC', 'bkgd':'DDDDD'},{'wb':'EEE','bkgd':'FFF'}]
+        self.Added_Img_tree = Img_Tree(files, self)
+        self.Right_Dock = QDockWidget('Selected Images', self)
+        self.Right_Dock.setWidget(self.Added_Img_tree)
+        self.Right_Dock.setFeatures(QDockWidget.NoDockWidgetFeatures)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.Right_Dock)
+
+
+
+
+    def dir_selection(self):
+        dir = QFileDialog.getExistingDirectory(self, "Choose a Directory", "~")
+        self.Current_Dir = dir
+        self.Tree.setRootIndex(self.Model.index(self.Current_Dir))
+        self.Left_Dock.setWindowTitle(dir)
+    
