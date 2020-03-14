@@ -1,10 +1,10 @@
 # 各种自定义Widgets
-from PyQt5.QtWidgets import QMainWindow, QDockWidget, QTreeView, QMenu, QAction, QTreeWidget, QListWidget, QAbstractItemView, QTreeWidgetItem, QDirModel, QPushButton, QFrame, QLineEdit, QLabel, QCheckBox, QHBoxLayout, QGridLayout, QVBoxLayout, QScrollArea,QFileDialog , QInputDialog
+from PyQt5.QtWidgets import QMainWindow, QFileSystemModel, QDockWidget, QTreeView, QMenu, QAction, QTreeWidget, QAbstractItemView, QTreeWidgetItem, QDirModel, QPushButton, QFrame, QLineEdit, QLabel, QCheckBox, QHBoxLayout, QGridLayout, QVBoxLayout, QScrollArea,QFileDialog , QInputDialog
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QRect, QRectF, QSize, QDir
 from PyQt5.QtGui import QFont, QPainter, QColor, QPen, QImage, QCursor, QGuiApplication
 from Utils import *
 import cv2
-import time
+import os, re
 
 
 class LabeledInPut(QFrame):
@@ -162,8 +162,8 @@ class ToolBar(QFrame):
         self.Flip_V = QCheckBox('Flap_V', self)
         self.Crop = Box('Crop: ', 'xywh', self)
         self.Marker = Box('Marker: ', 'wh', self)
-        self.Marker.Input_w.SetText(50)
-        self.Marker.Input_h.SetText(20)
+        self.Marker.Input_w.SetText(70)
+        self.Marker.Input_h.SetText(15)
         self.Hv = QGridLayout(self)
         self.blk = QLabel('', self)
         v = QVBoxLayout()
@@ -688,11 +688,21 @@ class Img(QLabel):
             if indicator:
                 indicator.setVisible(True)
                 indicator.setStyleSheet("border:2px solid red")
-                indicator.setGeometry(x - Marker_w / 2, y - Marker_h / 2,
-                                      Marker_w, Marker_h)
+                # 当Wb已经选定的时候添加的Marker默认吸附到crop边框上
+                if self.Temp_Indicator:
+                    crop = self.Temp_Indicator[0] #默认只有一个
+                    if crop.isVisible():
+                        c_x, c_w = crop.x(), crop.width()
+                        if (c_x + c_w) < x:
+                            # 右侧Marker的情况
+                            indicator.setGeometry(c_x + c_w, y - Marker_h / 2, Marker_w, Marker_h)
+                        if x < c_x:
+                            # 左侧Marker的情况
+                            indicator.setGeometry(c_x - Marker_w, y - Marker_h / 2, Marker_w, Marker_h)
+                else:
+                    indicator.setGeometry(x - Marker_w / 2, y - Marker_h / 2,
+                                        Marker_w, Marker_h)
                 indicator.Scale_Factor = self.Scale_Factor
-                #print(" Img Send change indicator Signal")
-                #indicator.Changed_Signal.emit()
 
         QLabel.mousePressEvent(self, event)
 
@@ -903,6 +913,7 @@ class LabeledImg(QFrame):
         self.FileName = Filename
         self.Img = Img(self.FileName, self)
         self.Label = QLabel(self.FileName, self)
+        self.Label.setWordWrap(True)
         self.scoller = MyScrollArea(self)
         self.scoller.setWidget(self.Img)
         self.scoller.setWidgetResizable(False)
@@ -916,7 +927,7 @@ class LabeledImg(QFrame):
         self.Img.Changed_Signal.connect(self.Send_Sync_info)
 
         self.Label.setAlignment(Qt.AlignHCenter)
-        self.Label.setMaximumHeight(30)
+        #self.Label.setMaximumHeight(30)
         hv = QVBoxLayout(self)
         hv.addWidget(self.Label)
         hv.addWidget(self.scoller)
@@ -996,8 +1007,8 @@ class Img_Block(QFrame):
         info['Flap_v'] = self.WB.Img.Flap_V
         info['crop'] = []
         info['markers'] = []
-        crops = self.WB.Img.Indicator
-        markers = self.BG.Img.Indicator
+        crops = [i for i in self.WB.Img.Indicator if i.isVisible()] # 确保只有可见的Indicator
+        markers = [i for i in self.BG.Img.Indicator if i.isVisible()] # 确保只有可见的Indicator
         for i in crops:
             info['crop'].append({'name': i.Name.text(), 'pos': i.Acture_Pos()})
         for i in markers:
@@ -1075,6 +1086,7 @@ class PreView_Img(QScrollArea):
         self.draw_Img = []  #{'rect':#}
         self.draw_rec = []  #{'rect':#}
         self.Spacer = '  '
+        self.crop_Center = 0 # 剪切中心
         for m in self.View_Info['markers']:
             text = m['name']
             text_w, text_h = self.Text_size(text + self.Spacer,
@@ -1121,6 +1133,7 @@ class PreView_Img(QScrollArea):
             self.draw_Img.append({'rect': c['pos']})
             self.draw_rec.append(
                 {'rect': (m_x - 2, m_y - 2, m_w + 3, m_h + 3)})
+            self.crop_Center = 2 * m_x + m_w
 
         l, t, r, b = [], [], [], []
         for i in self.draw_marker + self.draw_rec + self.draw_text + self.draw_Img:
@@ -1133,6 +1146,18 @@ class PreView_Img(QScrollArea):
         self.Info_T_Most = min(t) - 5 if len(t) > 0 else 0
         self.Info_R_Most = max(r) if len(r) > 0 else 0
         self.Info_B_Most = max(b) if len(b) > 0 else 0
+
+        # 调整L_Most 和R_Most 使其始终关于剪切图片中心对称
+        crop_Center = self.crop_Center
+
+        if crop_Center:
+            if self.Info_L_Most + self.Info_R_Most - crop_Center > 0:
+            # 需要增加左侧
+                self.Info_L_Most -= self.Info_R_Most - crop_Center + self.Info_L_Most
+            else:
+            # 需要增加右侧
+                self.Info_R_Most += crop_Center - self.Info_L_Most - self.Info_R_Most
+
         self.dx = -self.Info_L_Most
         self.dy = -self.Info_T_Most
 
@@ -1188,7 +1213,7 @@ class PreView_Img(QScrollArea):
         self.Load_info(info)
         Img = self.PreView()
         self.View.setPixmap(QPixmap.fromImage(Img))
-        #print(self.PreView_Img.size())
+        self.PreView_Img = Img
         self.View.adjustSize()
 
 
@@ -1224,36 +1249,6 @@ class Img_Block_Pre(QFrame):
         self.ImgB.BG.Img.Indicator_Change_Signal.connect(
             lambda: self.Pre.Sync_From([self.ImgB]))
 
-"""
-class My_Tree_View(QFrame):
-    def __init__(self, *args, **kwargs):
-        QFrame.__init__(self, *args, **kwargs)
-        self.Current_Path = QDir.home().absolutePath()
-        self.Path_Input = QLineEdit(self)
-        self.Go_Btn = QPushButton('Go', self)
-        self.Go_Btn.clicked.connect(self.Change_Dir)
-        
-        self.Tree.setAnimated(True)
-        self.Tree.setSortingEnabled(True)
-        self.Tree.setAlternatingRowColors(True)
-        Gd = QGridLayout(self)
-        Gd.addWidget(self.Path_Input, 0, 0)
-        self.Path_Input.setMaximumHeight(50)
-        Gd.addWidget(self.Go_Btn, 0, 1)
-        self.Go_Btn.setMaximumHeight(50)
-        Gd.addWidget(self.Tree, 1, 0, 0, 2)
-        Gd.setRowStretch(1, 10)
-        self.setLayout(Gd)
-        self.setStyleSheet("border: 2px solid red")
-
-    def Change_Dir(self):
-        self.Current_Path = self.Path_Input.text()
-        self.Tree.setRootIndex(self.model.index(self.Current_Path))
-
-    def resizeEvent(self, event):
-        #self.Tree.resize(self.Tree.width(), self.height()-50)
-        QFrame.resizeEvent(self, event)
-"""
 
 class My_TreeItem(QTreeWidgetItem):
     """
@@ -1262,6 +1257,8 @@ class My_TreeItem(QTreeWidgetItem):
     def __init__(self, *args, **kwargs):
         QTreeWidgetItem.__init__(self, *args, **kwargs)
         self.Type = 'WB'
+        self.Path = ''
+        self.Img_Block_Pre = None
         self.act_change = QAction('Change')
         self.act_delete = QAction('Delete')
 
@@ -1277,6 +1274,8 @@ class Img_Tree(QFrame):
     """
     本class实现将加载的dict 转化为列表tree（Wb_Img|_background_img）视图
     """
+    Tree_Click_Signal = pyqtSignal(list)
+
     def __init__(self, img_dict, *args, **kwargs):
         QFrame.__init__(self, *args, **kwargs)
         self.Tree = QTreeWidget(self)
@@ -1287,17 +1286,20 @@ class Img_Tree(QFrame):
         self.img_dict = img_dict
         self.Tree.setHeaderHidden(True)
         self.imgs = []
-        self.init_ui(self.img_dict)
+        self.Add_top_Level_Item(self.img_dict)
         self.layout = QVBoxLayout()
         self.layout.addWidget(self.Tree)
         self.setLayout(self.layout)
-        
+        self.Tree.clicked.connect(self.Tree_click)
 
-    def init_ui(self, img_dict):
+
+    def Add_top_Level_Item(self, img_dict):
         if img_dict:
             for img in img_dict:
                 c = My_TreeItem()
-                c.setText(0, img['wb'])
+                _, File = os.path.split(img['wb'])
+                c.setText(0, File)
+                c.Path = img['wb']
                 # 设置不可以被Drop
                 c.setFlags(c.flags() & ~Qt.ItemIsDropEnabled)
                 c.act_delete.triggered.connect(self.menu_delete)
@@ -1306,31 +1308,54 @@ class Img_Tree(QFrame):
                 cc = My_TreeItem(c)
                 cc.Type = 'BKGD'
                 cc.act_change.triggered.connect(self.menu_change)
-                cc.setText(0, img['bkgd'])
+                _, File = os.path.split(img['bkgd'])
+                cc.setText(0, File)
+                cc.Path = img['bkgd']
                 # 设置不可以被Drop
                 cc.setFlags(cc.flags() & ~Qt.ItemIsDropEnabled)
                 # 设置不可以被Drag
                 cc.setFlags(cc.flags() & ~ Qt.ItemIsDragEnabled)
                 self.Tree.addTopLevelItem(c)
-                self.imgs.append(c)
+            self.imgs = self.imgs + img_dict
 
     def enable_bottom_btn(self, bool):
         if bool:
             self.Add_Btn = QPushButton('Add New', self)
-            self.Add_Btn.clicked.connect(Broswer_Img(self).show)
+            self.Add_Btn.clicked.connect(self.Open_Pop_Wid)
             self.layout.addWidget(self.Add_Btn)
-        
-    
+
     def enable_contextmenu(self, bool):
         if bool:
             self.Tree.itemPressed.connect(self.show_menu)
+    
+    @pyqtSlot(list)
+    def connect_pop_wid(self, list):
+        """
+        将Pop_Wid选择的图片传递给左侧的文件树
+        """
+        self.Add_top_Level_Item(list)
 
+    def Open_Pop_Wid(self):
+        """
+        显示弹窗事件
+        """
+        Pop = Broswer_Img(self)
+        Pop.Close_Signal.connect(self.connect_pop_wid)
+        Pop.show()
 
+    def Tree_click(self, Index):
+        t = self.Tree.currentItem()
+        # 是顶层元素的时候
+        if t.parent() is None and t.child(0) is not None:
+            list = [t.Path, t.child(0).Path]
+            if t.Img_Block_Pre is None:
+                t.Img_Block_Pre = Img_Block_Pre(list, self)
+            self.Tree_Click_Signal.emit([t.Img_Block_Pre])
 
     @pyqtSlot(list)
     def update_img_list(self, new_img_list):
         self.Tree.clear()
-        self.init_ui(new_img_list)
+        self.Add_top_Level_Item(new_img_list)
 
     # 添加右键菜单事项
     def show_menu(self, item, int):
@@ -1355,6 +1380,7 @@ class Broswer_Img(QMainWindow):
     """
     选择图片文件并且预览，自动匹配多图的情况和背景图片
     """
+    Close_Signal = pyqtSignal(list)
     def __init__(self, *args, **kwargs):
         QMainWindow.__init__(self, *args, **kwargs)
         self.Current_Dir = QDir.home().absolutePath()
@@ -1363,18 +1389,28 @@ class Broswer_Img(QMainWindow):
         self.Left_Dock_Code()
         self.Central_Frame_Code()
         self.Right_Dock_Code()
-        self.setGeometry(200, 200, 800, 500)
-    
+        self.connect_Signals()
+
+        self.wb_nav_left.setEnabled(False)
+        self.wb_nav_right.setEnabled(False)
+        self.bkgd_nav_left.setEnabled(False)
+        self.bkgd_nav_right.setEnabled(False)
+
+        self.setGeometry(200, 200, 1700, 680)
+        self.setMaximumSize(QSize(1700, 680))
+
     def Left_Dock_Code(self):
         self.Left_Frame = QFrame(self)
-        self.Model = QDirModel(self)
-        self.Model.setSorting(QDir.DirsFirst | QDir.IgnoreCase | QDir.Name)
-        self.Model.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs
-                             | QDir.AllEntries)
+        self.Model = QFileSystemModel()
+        self.Model.setNameFilterDisables(False)
+        self.Model.setRootPath(self.Current_Dir)
+        #self.Model.setSorting(QDir.DirsFirst | QDir.IgnoreCase | QDir.Name)
+        self.Model.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs| QDir.AllEntries)
+        self.Model.setNameFilters(['*.tif'])
         self.Tree = QTreeView(self.Left_Frame)
         self.Tree.setModel(self.Model)
         self.Tree.setRootIndex(self.Model.index(self.Current_Dir))
-        #self.Tree.expandAll()
+        self.Tree.expandAll()
         self.Dir_Select = QPushButton("Select a Folder", self.Left_Frame)
         layout = QVBoxLayout()
         layout.addWidget(self.Tree)
@@ -1385,30 +1421,44 @@ class Broswer_Img(QMainWindow):
         self.Left_Dock.setFeatures(QDockWidget.NoDockWidgetFeatures)
         self.Dir_Select.clicked.connect(self.dir_selection)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.Left_Dock)
-    
+
     def Central_Frame_Code(self):
         self.Central_Frame = QFrame(self)
         layout = QGridLayout()
         self.wb_label = QLabel(self.Central_Frame)
         self.bkgd_label = QLabel(self.Central_Frame)
-        self.wb_label.setMaximumHeight(30)
+        #self.wb_label.setMaximumHeight(30)
+        self.wb_label.setWordWrap(True)
         
         self.wb = QLabel(self.Central_Frame)
+        self.wb.setScaledContents(True)
         self.bkgd = QLabel(self.Central_Frame)
+        self.bkgd.setScaledContents(True)
+        self.wb.setMaximumSize(QSize(561, 449))
+        self.bkgd.setMaximumSize(QSize(561, 449))
         
-        self.navigator = QFrame(self.Central_Frame)
-        self.nav_left = QPushButton(self.navigator)
-        self.nav_right = QPushButton(self.navigator)
+        self.wb_navigator = QFrame(self.Central_Frame)
+        self.wb_nav_left = QPushButton('<--', self.wb_navigator)
+        self.wb_nav_right = QPushButton('-->', self.wb_navigator)
         nav_layout = QHBoxLayout()
-        nav_layout.addWidget(self.nav_left)
-        nav_layout.addWidget(self.nav_right)
-        self.navigator.setLayout(nav_layout)
-        self.navigator.setMaximumHeight(40)
+        nav_layout.addWidget(self.wb_nav_left)
+        nav_layout.addWidget(self.wb_nav_right)
+        self.wb_navigator.setLayout(nav_layout)
+        self.wb_navigator.setMaximumHeight(60)
+
+        self.bkgd_navigator = QFrame(self.Central_Frame)
+        self.bkgd_nav_left = QPushButton('<--', self.bkgd_navigator)
+        self.bkgd_nav_right = QPushButton('-->', self.bkgd_navigator)
+        nav_layout2 = QHBoxLayout()
+        nav_layout2.addWidget(self.bkgd_nav_left)
+        nav_layout2.addWidget(self.bkgd_nav_right)
+        self.bkgd_navigator.setLayout(nav_layout2)
+        self.bkgd_navigator.setMaximumHeight(60)
 
         self.btns = QFrame(self.Central_Frame)
-        self.btns.setMaximumHeight(40)
-        self.Btn_Add = QPushButton(self.btns)
-        self.Btn_Close = QPushButton(self.btns)
+        self.btns.setMaximumHeight(60)
+        self.Btn_Add = QPushButton('Add', self.btns)
+        self.Btn_Close = QPushButton('Close', self.btns)
         btn_layout = QHBoxLayout()
         btn_layout.addWidget(self.Btn_Add)
         btn_layout.addWidget(self.Btn_Close)
@@ -1421,30 +1471,139 @@ class Broswer_Img(QMainWindow):
         layout.addWidget(self.wb, 1, 0)
         layout.addWidget(self.bkgd, 1, 1)
         
-        layout.addWidget(self.navigator, 2, 0)
+        layout.addWidget(self.wb_navigator, 2, 0)
+        layout.addWidget(self.bkgd_navigator, 2, 1)
         
         layout.addWidget(self.btns, 3, 0, 2, 0)
         layouts = QVBoxLayout()
         layouts.addLayout(layout)
         self.Central_Frame.setLayout(layouts)
         self.setCentralWidget(self.Central_Frame)
-        self.setStyleSheet('border:1px solid red')
-
+        #self.setStyleSheet('border:1px solid red')
 
     def Right_Dock_Code(self):
-        files=[{'wb':'AAAAAAAA', 'bkgd':'BBBBB'}, {'wb':'CCCCC', 'bkgd':'DDDDD'},{'wb':'EEE','bkgd':'FFF'}]
-        self.Added_Img_tree = Img_Tree(files, self)
+        self.Added_Img_tree = Img_Tree([], self)
         self.Right_Dock = QDockWidget('Selected Images', self)
         self.Right_Dock.setWidget(self.Added_Img_tree)
         self.Right_Dock.setFeatures(QDockWidget.NoDockWidgetFeatures)
         self.addDockWidget(Qt.RightDockWidgetArea, self.Right_Dock)
 
+    def connect_Signals(self):
+        self.Tree.clicked.connect(self.Load_Img_to_Central_Frame)
+        self.wb_nav_left.clicked.connect(self.change_img_index)
+        self.wb_nav_right.clicked.connect(self.change_img_index)
+        self.bkgd_nav_left.clicked.connect(self.change_img_index)
+        self.bkgd_nav_right.clicked.connect(self.change_img_index)
+        self.Btn_Add.clicked.connect(self.Add_Btn_Action)
+        self.Btn_Close.clicked.connect(self.Close_Btn_Action)
 
+    def Load_Img_to_Central_Frame(self, Index):
+        select_file = self.Tree.model().filePath(Index)
+        _, ext = os.path.splitext(select_file)
+        if ext in ['.tif', '.jpeg', '.png', '.jpg']:
+            self.Related_Imgs = BioRad_Imgs(select_file)
+        self.set_Central_Frame()
 
+    def set_Central_Frame(self):
+        self.wb_nav_left.setEnabled(False)
+        self.wb_nav_right.setEnabled(False)
+        self.bkgd_nav_left.setEnabled(False)
+        self.bkgd_nav_right.setEnabled(False)
+
+        self.current_wb = self.Related_Imgs.WB_list[self.Related_Imgs.wb_index]
+        self.current_bkgd = self.Related_Imgs.BKGD_list[self.Related_Imgs.bkgd_index]
+        self.wb_label.setText(self.current_wb.replace(self.Related_Imgs.Dir, '.'))
+        self.bkgd_label.setText(self.current_bkgd.replace(self.Related_Imgs.Dir, '.'))
+        wb, _ = CV_Img_to_QImage(cv2.imread(self.current_wb))
+        bkgd, _ =CV_Img_to_QImage(cv2.imread(self.current_bkgd))
+        self.wb.setPixmap(wb)
+        self.wb.setScaledContents(True)
+        self.bkgd.setPixmap(bkgd)
+        wb_len = len(self.Related_Imgs.WB_list)
+        bkgd_len = len(self.Related_Imgs.BKGD_list)
+        if self.Related_Imgs.wb_index > 0:
+            self.wb_nav_left.setEnabled(True)
+        if wb_len - self.Related_Imgs.wb_index > 1:
+            self.wb_nav_right.setEnabled(True)
+        
+        if self.Related_Imgs.bkgd_index > 0:
+            self.bkgd_nav_left.setEnabled(True)
+        if bkgd_len - self.Related_Imgs.bkgd_index > 1:
+            self.bkgd_nav_right.setEnabled(True)
+
+    def change_img_index(self):
+        sender = self.sender()
+        if sender == self.wb_nav_left:
+            self.Related_Imgs.wb_index =  self.Related_Imgs.wb_index - 1
+        if sender == self.wb_nav_right:
+            self.Related_Imgs.wb_index =  self.Related_Imgs.wb_index + 1
+        if sender == self.bkgd_nav_left:
+            self.Related_Imgs.bkgd_index =  self.Related_Imgs.bkgd_index - 1
+        if sender == self.bkgd_nav_right:
+            self.Related_Imgs.bkgd_index =  self.Related_Imgs.bkgd_index + 1
+        self.set_Central_Frame()
+
+    def Add_Btn_Action(self):
+        list = [{'wb':self.current_wb, 'bkgd':self.current_bkgd}]
+        self.Added_Img_tree.Add_top_Level_Item(list)
+        print(self.Added_Img_tree.imgs)
+    
+    def Close_Btn_Action(self):
+        self.close()
+    
+    def closeEvent(self, event):
+        self.Close_Signal.emit(self.Added_Img_tree.imgs)
 
     def dir_selection(self):
         dir = QFileDialog.getExistingDirectory(self, "Choose a Directory", "~")
         self.Current_Dir = dir
         self.Tree.setRootIndex(self.Model.index(self.Current_Dir))
         self.Left_Dock.setWindowTitle(dir)
+
+
+class BioRad_Imgs():
+    """
+    处理BioRad仪器的导出图片显示情况
+    实现功能，根据传入的图片，查找同级目录，上级目录，以及与文件名称相同的下级目录里面的图片
+    并判断返回WB图片，背景图片
+    """
+    def __init__(self, img_path):
+        self.Current_Img = img_path
+        Path, Img = os.path.split(img_path)
+        _, ext = os.path.splitext(img_path)
+        self.Dir = Path
+        self.Img = Img
+        self.ext = ext
+        self.Name_Pattern = re.findall(r'(.+)_\d',Img)[0]
+        self.WB_list = []
+        self.BKGD_list = []
+        self.search_same_files(self.Dir)
+        self.wb_index = self.WB_list.index(os.path.join(Path, Img)) if 'Chemiluminescence' in Img else 0
+        self.bkgd_index = self.BKGD_list.index(os.path.join(Path, Img)) if 'Colorimetric' in Img else 0
     
+    def search_same_files(self, Dir):
+        Sub_Dir = []
+        pattern_list = [p for p in os.listdir(Dir) if self.Name_Pattern in p]
+        for item in pattern_list:
+            t = os.path.join(Dir, item)
+            if 'Chemiluminescence)' + self.ext in item:
+                self.WB_list.append(t)
+            if 'Colorimetric)' + self.ext in item:
+                self.BKGD_list.append(t)
+            if os.path.isdir(t):
+                Sub_Dir.append(t)
+        for d in Sub_Dir:
+            self.search_same_files(d)
+            
+class Anotation():
+    pass
+
+class Image_Editor():
+    pass
+
+
+    
+
+
+
+        

@@ -78,48 +78,65 @@ class UI(QMainWindow):
         opdir.triggered.connect(self.Set_Dir)
         toobar.addAction(opdir)
         toobar.addWidget(self.Tb)
-        #toobar.move(0, 0)
 
         self.Files = QDockWidget('Loaded Image Files')
-        model = QDirModel(self)
-        home_path = QDir.currentPath()
-        #model.setRootPath(home_path)
-        model.setSorting(QDir.DirsFirst | QDir.IgnoreCase | QDir.Name)
-        model.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs | QDir.AllEntries)
-
-        #home_index = model.index(home_path)
-        #self.treeSpace = My_Tree_View(self)
-        #self.treeSpace.expand(home_index)
-        #self.treeSpace.scrollTo(home_index)
-        files = [{
-            'wb': 'AAAAAAAA',
-            'bkgd': 'BBBBB'
-        }, {
-            'wb': 'CCCCC',
-            'bkgd': 'DDDDD'
-        }, {
-            'wb': 'EEE',
-            'bkgd': 'FFF'
-        }]
-        self.load = Img_Tree(files, self)
-        self.load.enable_bottom_btn(True)
-        self.load.enable_contextmenu(True)
-        self.Files.setWidget(self.load)
-
-        #self.Files.setFloating(False)
+        file2 = [{'wb': '/media/nzt/LENOVO1/YQ,WWY/2020-实验/wb/ChemiDoc Images 2020-03-06_12.16.39/20200306-stambpl1-in-8cells_1(Chemiluminescence).tif', 'bkgd': '/media/nzt/LENOVO1/YQ,WWY/2020-实验/wb/ChemiDoc Images 2020-03-06_12.16.39/20200306-stambpl1-in-8cells_7(Colorimetric).tif'}, {'wb': '/media/nzt/LENOVO1/YQ,WWY/2020-实验/wb/ChemiDoc Images 2020-03-06_12.16.39/20200306-otub2-in-8cells_1(Chemiluminescence).tif', 'bkgd': '/media/nzt/LENOVO1/YQ,WWY/2020-实验/wb/ChemiDoc Images 2020-03-06_12.16.39/20200306-otub2-in-8cells_8(Colorimetric).tif'}]
+        self.Selected_Imgs = Img_Tree(file2, self)
+        self.Selected_Imgs.enable_bottom_btn(True)
+        self.Selected_Imgs.enable_contextmenu(True)
+        self.Files.setWidget(self.Selected_Imgs)
         self.Files.setFeatures(QDockWidget.NoDockWidgetFeatures)
-
         self.addDockWidget(Qt.LeftDockWidgetArea, self.Files)
+        self.Selected_Imgs.Tree_Click_Signal.connect(self.Connect_Tree_To_Tab)
 
-        Img_list = ['blot.tif', 'background.tif']
-        Frame1 = Img_Block_Pre(Img_list, self)
+        Frame1 = QLabel('Add files to left Dock to Beign!',self)
+        Frame1.setFont(QFont('Arial',20))
+        Frame1.setAlignment(Qt.AlignCenter)
         self.Current = Frame1
-        Tab = QTabWidget(self)
-        Tab.addTab(self.Current, 'Main')
-        Tab.addTab(QFrame(), 'Final')
-        self.setCentralWidget(Tab)
+        self.Tab = QTabWidget(self)
+        self.Tab.addTab(self.Current, 'Main')
+        self.Preview = QFrame(self.Tab)
+        self.Tab.addTab(self.Preview, 'Final')
+        self.setCentralWidget(self.Tab)
+        self.Tab.currentChanged.connect(self.Prev)
         self.Tb.Changed.connect(self.Syncing_Tb_to_Imgb)
 
+    # Connect Tree_Click to Tab Panel
+    def Connect_Tree_To_Tab(self, img_block_pre):
+        self.Current = img_block_pre[0]
+        self.Tab.removeTab(0)
+        self.Tab.insertTab(0, self.Current, 'Current')
+        self.Tab.setCurrentIndex(0)
+
+    # Preview function
+    def Prev(self, index):
+        if index == 1:
+            layout = self.Preview.layout()
+            if layout is None:
+                ly = QVBoxLayout()
+                ly.setSpacing(10)
+                self.Preview.setLayout(ly)
+                layout = self.Preview.layout()
+            tree = self.Selected_Imgs.Tree
+            max_height = 0
+            max_width = 0
+            for i in range(tree.topLevelItemCount()):
+                t = tree.topLevelItem(i)
+                img = t.Img_Block_Pre.Pre.PreView_Img
+                try:
+                    q = layout.itemAt(i).widget()
+                except AttributeError:
+                    q = QLabel(self.Preview)
+                    layout.addWidget(q)
+                    q.setAlignment(Qt.AlignCenter)
+                q.setPixmap(QPixmap.fromImage(img))
+                q.setMaximumHeight(img.height() + 4)
+                max_height += img.height()
+                max_width = max(max_width, img.width())
+            self.Preview.setMaximumSize(max_width + layout.spacing() * 2, layout.spacing() * (i + 2) + max_height)
+            #self.Preview.setStyleSheet("border: 1px solid red")
+                
+        pass
     #@Sig_log
     def Syncing_Imgb_to_Tb(self):
         print("GuI Start Syncing Imgb to Tb")
