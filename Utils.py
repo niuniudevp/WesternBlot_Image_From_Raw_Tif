@@ -1,8 +1,8 @@
 # 基本的功能函数##
 
-from PyQt5.QtGui import QImage, QPixmap, QTransform
+from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import Qt
-from Img_Utils import resize_img, rotate_img, flip_img_h, flip_img_hv, flip_img_v, bgr2rgb
+from Img_Utils import resize_img, rotate_img, flip_img_h, flip_img_v, bgr2rgb
 
 
 def get_marker_pos(midpos):

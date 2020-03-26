@@ -1,7 +1,9 @@
-from PyQt5.QtWidgets import QMainWindow, QLabel, QTabWidget, QDockWidget, QFileSystemModel, QListWidget, QAction, QFileDialog, QDirModel, QTreeView
-from PyQt5.QtGui import QPixmap, QTransform, QImage
-
-from Block import *
+from PyQt5.QtWidgets import QMainWindow, QLabel, QTabWidget, QDockWidget, QListWidget, QAction, QFileDialog
+from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt
+from Base import ToolBar
+from Image_Tree import Img_Tree
+from Image_Editor import Image_Editor
 import os
 
 
@@ -45,8 +47,8 @@ class UI(QMainWindow):
         #self.Pre.setGeometry(10, self.ImgB.y()+ self.ImgB.height() + 10 , self.width() - 20, 150)
 
     def Test(self):
-        self.D = Anotation(self)
-        self.D.SetColumn('1,2,3')
+        pass
+
     def Set_Dir(self):
         dir = QFileDialog.getExistingDirectory(self, "Choose a Directory", "~")
         self.Select_Dir = dir
@@ -98,35 +100,8 @@ class UI(QMainWindow):
             self.Preview.display_img(self.Selected_Imgs.Tree)
             print(self.Selected_Imgs.imgs)
     # Preview function
-    def Prev(self, index):
-        if index == 1:
-            layout = self.Preview.layout()
-            if layout is None:
-                ly = QVBoxLayout()
-                ly.setSpacing(10)
-                self.Preview.setLayout(ly)
-                layout = self.Preview.layout()
-            tree = self.Selected_Imgs.Tree
-            max_height = 0
-            max_width = 0
-            for i in range(tree.topLevelItemCount()):
-                t = tree.topLevelItem(i)
-                img = t.Img_Block_Pre.Pre.PreView_Img
-                try:
-                    q = layout.itemAt(i).widget()
-                except AttributeError:
-                    q = QLabel(self.Preview)
-                    layout.addWidget(q)
-                    q.setAlignment(Qt.AlignCenter)
-                q.setPixmap(QPixmap.fromImage(img))
-                q.setMaximumHeight(img.height() + 4)
-                max_height += img.height()
-                max_width = max(max_width, img.width())
-            self.Preview.setMaximumSize(max_width + layout.spacing() * 2, layout.spacing() * (i + 2) + max_height)
-            #self.Preview.setStyleSheet("border: 1px solid red")
-                
-        pass
     #@Sig_log
+    
     def Syncing_Imgb_to_Tb(self):
         print("GuI Start Syncing Imgb to Tb")
         self.Tb.Toolbar_Sync_From_Img_Block([self.Current.ImgB])
@@ -136,27 +111,3 @@ class UI(QMainWindow):
     def Syncing_Tb_to_Imgb(self):
         print("GUI Syncing Tb to Imgb")
         self.Current.ImgB.Sync_from_toobar(self.Tb)
-
-
-class Demo(QLabel):
-    def __init__(self, *args, **kwargs):
-        QLabel.__init__(self, *args, **kwargs)
-        WB = 'OET.jpeg'
-        self.setStyleSheet("border:1px solid blue")
-        #self.setGeometry(0, 0, 800, 800)
-        #self.setPixmap(QPixmap('OET.jpeg'))
-        self.setFont(QFont('Arial', 20))
-        self.setText("ABCEDF")
-        self.adjustSize()
-        print(self.geometry())
-
-    def paintEvents(self, event):
-        pt = QPainter()
-        pt.begin(self)
-        pt.setFont(QFont('Arial', 20))
-        pt.setPen(QPen(QColor(0, 0, 0), 5))
-        pt.drawText(22, 150, 'AAVVVFFDD')
-        pt.drawRect(QRect(100, 100, 100, 100))
-        pt.end()
-        self.setFont(QFont('Arial', 20))
-        self.setText("ABCEDF")
