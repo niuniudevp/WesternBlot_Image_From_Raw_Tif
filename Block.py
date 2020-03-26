@@ -1,5 +1,5 @@
 # 各种自定义Widgets
-from PyQt5.QtWidgets import QMainWindow, QFileSystemModel, QDockWidget, QTreeView, QMenu, QAction, QTreeWidget, QAbstractItemView, QTreeWidgetItem, QDirModel, QPushButton, QFrame, QLineEdit, QLabel, QCheckBox, QHBoxLayout, QGridLayout, QVBoxLayout, QScrollArea,QFileDialog , QInputDialog
+from PyQt5.QtWidgets import QMainWindow, QSizePolicy, QComboBox, QFileSystemModel, QDockWidget, QTextEdit, QTreeView, QMenu, QAction, QTreeWidget, QAbstractItemView, QTreeWidgetItem, QDirModel, QPushButton, QFrame, QLineEdit, QLabel, QCheckBox, QHBoxLayout, QGridLayout, QVBoxLayout, QScrollArea,QFileDialog , QInputDialog
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QRect, QRectF, QSize, QDir
 from PyQt5.QtGui import QFont, QPainter, QColor, QPen, QImage, QCursor, QGuiApplication
 from Utils import *
@@ -158,8 +158,8 @@ class ToolBar(QFrame):
         self.Rotation = LabeledInPut('Rotation:', 0.00, self)
         self.Rotation.Set_Mini_value(-90)
         self.Rotation.Set_Max_value(90)
-        self.Flip_H = QCheckBox('Flap_H', self)
-        self.Flip_V = QCheckBox('Flap_V', self)
+        self.Flip_H = QCheckBox('Flip_H', self)
+        self.Flip_V = QCheckBox('Flip_V', self)
         self.Crop = Box('Crop: ', 'xywh', self)
         self.Marker = Box('Marker: ', 'wh', self)
         self.Marker.Input_w.SetText(70)
@@ -588,9 +588,9 @@ class Img(QLabel):
         self.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.Pressed_Mouse = None
         self.Mouse_Press_Loc = []
-        self.H_Refer_Line = Reference_Line("H", 924, self)
+        self.H_Refer_Line = Reference_Line("H", 200, self)
         self.H_Refer_Line.Label.Only_Move_V = True
-        self.V_Refer_Line = Reference_Line("V", 300, self)
+        self.V_Refer_Line = Reference_Line("V", 200, self)
         self.V_Refer_Line.Label.Only_Move_H = True
         self.Temp_Indicator = []
         self.Indicator_Add.connect(self.Link_Indicator_Add_to_Change)
@@ -606,16 +606,16 @@ class Img(QLabel):
         Cv_Img = cv2.imread(Filename)
         self.Src_Img = Cv_Img
 
-    def Display_Img(self, Scale_Factor=1, Angle=0, Flap_H=False, Flap_V=False):
+    def Display_Img(self, Scale_Factor=1, Angle=0, Flip_H=False, Flip_V=False):
         CV_Img = self.Src_Img
         QPix, (width, height) = CV_Img_to_QImage(CV_Img, Scale_Factor, Angle,
-                                                 Flap_H, Flap_V)
+                                                 Flip_H, Flip_V)
         self.Scale_Factor = Scale_Factor
         self.Angle = Angle
         self.Img_Width = width
         self.Img_Height = height
-        self.Flap_H = Flap_H
-        self.Flap_V = Flap_V
+        self.Flip_H = Flip_H
+        self.Flip_V = Flip_V
         self.setPixmap(QPix)
         self.Displayed_Img = QPix
         # Scale Factor 改变的时候也要更新参考线
@@ -734,8 +734,8 @@ class Img(QLabel):
         #New_Scale_Factor = round(New_Scale_Factor,2)
         print(self.Action_Type + " Resized from " + str(self.Scale_Factor) +
               " to " + str(New_Scale_Factor))
-        self.Display_Img(New_Scale_Factor, self.Angle, self.Flap_H,
-                         self.Flap_V)
+        self.Display_Img(New_Scale_Factor, self.Angle, self.Flip_H,
+                         self.Flip_V)
 
         self.Scale_Factor = New_Scale_Factor
         # Indicator也要缩放
@@ -825,8 +825,8 @@ class Img(QLabel):
         self.Scale_Factor = src.Scale_Factor
         self.Angle = src.Angle
         print("[Img] Syncing # 同步图片")
-        self.Display_Img(self.Scale_Factor, self.Angle, self.Flap_H,
-                         self.Flap_V)
+        self.Display_Img(self.Scale_Factor, self.Angle, self.Flip_H,
+                         self.Flip_V)
         #print("[Img] Syncing # 更新自身的Indicators")
         #for i in self.Indicator:
         #    i.Scaled(self.Scale_Factor)
@@ -984,11 +984,11 @@ class Img_Block(QFrame):
         ), Tb.Crop.Input_w.Value(), Tb.Crop.Input_h.Value()
         mw, mh = Tb.Marker.Input_w.Value(), Tb.Marker.Input_h.Value()
         Angle = Tb.Rotation.Value()
-        Flap_H = Tb.Flip_H.isChecked()
-        Flap_V = Tb.Flip_V.isChecked()
+        Flip_H = Tb.Flip_H.isChecked()
+        Flip_V = Tb.Flip_V.isChecked()
         Scale_Factor = self.WB.Img.Scale_Factor
-        self.WB.Img.Display_Img(Scale_Factor, Angle, Flap_H, Flap_V)
-        self.BG.Img.Display_Img(Scale_Factor, Angle, Flap_H, Flap_V)
+        self.WB.Img.Display_Img(Scale_Factor, Angle, Flip_H, Flip_V)
+        self.BG.Img.Display_Img(Scale_Factor, Angle, Flip_H, Flip_V)
 
         for i in self.WB.Img.Indicator:
             i.Set_Acture_Pos(x, y, w, h)
@@ -1003,8 +1003,8 @@ class Img_Block(QFrame):
         info = {}
         info['filename'] = self.WB.Img.FileName
         info['rotation'] = self.WB.Img.Angle
-        info['Flap_h'] = self.WB.Img.Flap_H
-        info['Flap_v'] = self.WB.Img.Flap_V
+        info['Flip_h'] = self.WB.Img.Flip_H
+        info['Flip_v'] = self.WB.Img.Flip_V
         info['crop'] = []
         info['markers'] = []
         crops = [i for i in self.WB.Img.Indicator if i.isVisible()] # 确保只有可见的Indicator
@@ -1197,8 +1197,8 @@ class PreView_Img(QScrollArea):
         for p in self.draw_Img:
             im, _ = CV_Img_to_QImage(self.View_Info['src_img'], 1,
                                      self.View_Info['rotation'],
-                                     self.View_Info['Flap_h'],
-                                     self.View_Info['Flap_v'])
+                                     self.View_Info['Flip_h'],
+                                     self.View_Info['Flip_v'])
             x, y, w, h = p['rect']
             im = im.copy(x, y, w, h)
             x, y, w, h = self.rect_fix(p['rect'])
@@ -1594,16 +1594,304 @@ class BioRad_Imgs():
                 Sub_Dir.append(t)
         for d in Sub_Dir:
             self.search_same_files(d)
-            
-class Anotation():
-    pass
-
-class Image_Editor():
-    pass
 
 
+class Magic_Input(QLineEdit):
+    def __init__(self, *args, **kwargs):
+        QLineEdit.__init__(self, *args, **kwargs)
+        self.textEdited.connect(self.update)
+        self.Actived = False
     
+    def paintEvent(self, event):
+        text = self.text()
+        qp = QPainter()
+        qp.begin(self)
+        if text == "@--":
+            self.setFrame(False)
+            pen = QPen(Qt.black, 2, Qt.SolidLine)
+            qp.setPen(pen)
+            half = int(self.height()/2)
+            qp.drawText(event.rect(),Qt.AlignCenter,"AVC")
+            qp.drawLine(0, half, self.width(), half)
+            #self.setText("")
+        if text =="@>":
+            pass
+        if text =="@<":
+            pass
+        qp.end()
+        QLineEdit.paintEvent(self,event)
+    
+    def focusInEvent(self, event):
+        P = Get_Super_Parent(self)
+        All_Magic_input = P.findChildren(Magic_Input)
+        for t in All_Magic_input:
+            t.Actived = False
+            t.setFixedSize(t.width(), t.height())
+            
+            t.setStyleSheet('border:1px solid red')
+        self.Actived = True
+        self.setStyleSheet('border: 2px solid green')
+
+
+class Anotation(QFrame):
+    # 增加注释功能
+
+    def __init__(self, *args, **kwargs):
+        QFrame.__init__(self, *args, **kwargs)
+        self.Label = ""
+        hv = QHBoxLayout()
+        hv.setContentsMargins(0,0,0,0)
+        hv.setSpacing(2)
+        self.setLayout(hv)
+        self.resize(500, 30)
+        self.setStyleSheet("border: 1px solid red")
+    
+    def SetColumn(self, split_str):
+        """
+        逗号分割各个部分的比例
+        """
+        space_list = split_str.split(',')
+        ly = self.layout()
+        for i in range(len(space_list)):
+            t = Magic_Input(self)
+            t.setAlignment(Qt.AlignCenter)
+            #t.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            ly.addWidget(t)
+            ly.setStretchFactor(t, int(space_list[i]))
+
+    def SetFont(self,QFont):
+        for item in self.layout().count:
+            pass
+
+    def SetFontSize(self, font_size):
+        pass
+
+    def SetBold(self):
+        pass
+
+    def SetItalic(self):
+        pass
 
 
 
+
+class Text_Act_Btn(QFrame):
+    Action_Signal = pyqtSignal(str)
+    def __init__(self, *args, **kwargs):
+        QFrame.__init__(self, *args, **kwargs)
+        self.UI()
+        self.signals()
+    
+    def UI(self):
+        hv = QHBoxLayout()
+        self.Action_Type = QComboBox(self)
+        self.Action_Type.addItem('Cell')
+        self.Action_Type.addItem('Row')
+        self.Btn_MoveLeft = QPushButton("<<<", self)
+        self.Btn_MoveRight = QPushButton(">>>", self)
+        self.Btn_Larger = QPushButton(" + ", self)
+        self.Btn_Smaller = QPushButton(" - ", self)
+        self.Rotation = LabeledInPut("Rotation: ", 0, self)
+        hv.addWidget(self.Action_Type)
+        hv.addWidget(self.Btn_MoveLeft)
+        hv.addWidget(self.Btn_Larger)
+        hv.addWidget(self.Btn_Smaller)
+        hv.addWidget(self.Btn_MoveRight)
+        hv.addWidget(self.Rotation)
+        self.setLayout(hv)
+    
+    def signals(self):
+        self.Btn_MoveLeft.clicked.connect(self.Send_Signal)
+        self.Btn_MoveRight.clicked.connect(self.Send_Signal)
+        self.Btn_Larger.clicked.connect(self.Send_Signal)
+        self.Btn_Smaller.clicked.connect(self.Send_Signal)
+        self.Rotation.Changed_Signal.connect(self.Send_Signal)
+    
+    def Send_Signal(self):
+        sender = self.sender()
+        target_is_cell = self.Action_Type.currentText() == 'Cell'
+        if sender == self.Btn_MoveLeft:
+            if target_is_cell:
+                self.Action_Signal.emit('<')
+            else:
+                self.Action_Signal.emit('0<')
+        if sender == self.Btn_MoveRight:
+            if target_is_cell:
+                self.Action_Signal.emit('>')
+            else:
+                self.Action_Signal.emit('0>')
+        if sender == self.Btn_Larger:
+            if target_is_cell:
+                self.Action_Signal.emit('+')
+            else:
+                self.Action_Signal.emit('0+')
+        if sender == self.Btn_Smaller:
+            if target_is_cell:
+                self.Action_Signal.emit('-')
+            else:
+                self.Action_Signal.emit('0-')
+        if sender == self.Rotation:
+            angel = self.Rotation.Value()
+            self.Action_Signal.emit(angel)
+
+
+class Image_Editor(QFrame):
+    #整合注释功能和图片预览功能
+    def __init__(self, *args, **kwargs):
+        QFrame.__init__(self, *args, **kwargs)
+        self.Preview_Btn = QPushButton("Preview",self)
+        self.Add_Anon_Btn = QPushButton("Add Anotation", self)
+        self.Action_Btns = Text_Act_Btn(self)
+        self.Core = QFrame(self)
+        self.Anotation = QVBoxLayout()
+        self.Anotation.setAlignment(Qt.AlignCenter)
+        self.Anotation_Frame = QFrame(self.Core)
+        #self.Anotation_Frame.Can_Move_with_Mouse = True
+        #self.Anotation_Frame.Can_Adjust_Edge = True
+        self.Anotation_Frame.setStyleSheet("border:1px solid green")
+        self.Anotation_Frame.setLayout(self.Anotation)
+        self.Imgs = QVBoxLayout()
+        self.Imgs.setAlignment(Qt.AlignCenter)
+        self.Imgs_Frame = QFrame(self.Core)
+        self.Imgs_Frame.setLayout(self.Imgs)
+        #self.Imgs_Frame.setStyleSheet("border:1px solid red")
+        self.DrawRect = []
+        self.Info = QTextEdit(self.Core)
+        hv = QVBoxLayout()
+        hv.addWidget(self.Preview_Btn)
+        hv.addWidget(self.Add_Anon_Btn)
+        hv.addWidget(self.Action_Btns)
+        core = QVBoxLayout()
+        core.addWidget(self.Anotation_Frame)
+        core.addWidget(self.Imgs_Frame)
+        core.addWidget(self.Info)
+        self.Core.setLayout(core)
+        #self.Core.setStyleSheet("border:1px solid green")
+        hv.addWidget(self.Core)
+        # 顶层Layout
+        main = QHBoxLayout()
+        # 整体预览Frame
+        self.Preview = QLabel(self)
+        self.Preview.setStyleSheet("border:1px solid red")
+        main.addLayout(hv)
+        main.addWidget(self.Preview)
+        main.setStretch(0,1)
+        main.setStretch(1,1)
+        self.setLayout(main)
+        self.signal_connections()
+        self.setMinimumSize(500, 800)
+    
+    def signal_connections(self):
+        self.Add_Anon_Btn.clicked.connect(self.Add_Anotation)
+        self.Action_Btns.Action_Signal.connect(self.Adjust_Response)
+        self.Preview_Btn.clicked.connect(self.Gene_Preview)
+    
+    def Add_Anotation(self):
+        an = Anotation(self)
+        # 后面添加split_str的验证
+        split_str = "1"
+        split_str, okPressed = QInputDialog.getText(None, "Input Grid Mode",
+                                                   "Input grid mode(split by \",\")",
+                                                   QLineEdit.Normal,
+                                                   split_str)
+        an.SetColumn(split_str)
+        x, y, w, h = self.DrawRect
+        an.setMaximumSize(w, h)
+        self.Anotation.addWidget(an)
+    
+    def display_img(self, Tree_obj):
+        max_height = 0
+        max_width = 0
+        for i in range(Tree_obj.topLevelItemCount()):
+            t = Tree_obj.topLevelItem(i)
+            img = t.Img_Block_Pre.Pre.PreView_Img
+            self.DrawRect = t.Img_Block_Pre.Pre.draw_rec[0]['rect']
+            try:
+                q = self.Imgs.itemAt(i).widget()
+            except AttributeError:
+                q = QLabel(self.Imgs_Frame)
+                self.Imgs.addWidget(q)
+                q.setAlignment(Qt.AlignCenter)
+            q.setPixmap(QPixmap.fromImage(img))
+            
+            #q.setMaximumSize(img.width(),img.height())
+            #q.setMaximumHeight(img.height() + 4)
+            max_height += img.height()
+            max_width = max(max_width, img.width())
+        #self.Imgs_Frame.setMaximumSize(max_width + self.Imgs.spacing() * 2, self.Imgs.spacing() * (i + 2) + max_height)
+
+    #@pyqtSlot()
+    def Adjust_Response(self, par):
+        def get_Current_Focus_cell():
+            for i in range(self.Anotation.count()):
+                row = self.Anotation.itemAt(i).widget()
+                for j in range(row.layout().count()):
+                    cell = row.layout().itemAt(j).widget()
+                    if cell.Actived:
+                        return row, cell
+            return None, None
         
+        row, cell = get_Current_Focus_cell()
+        if type(par) == str:
+            if "0" in par:
+                target = row
+            else:
+                target = cell
+            if target is not None:
+                x, y, w, h = target.x(), target.y(), target.width(), target.height()
+                if '>' in par:
+                    target.setGeometry(x + 1, y, w, h)
+                    target.setFixedSize(w, h)
+                if '<' in par:
+                    target.setGeometry(x - 1, y, w, h)
+                    target.setFixedSize(w, h)
+                if '+' in par:
+                    target.setGeometry(x - 1, y, w + 2, h)
+                    target.setFixedSize(w + 2, h)
+                if '-' in par:
+                    target.setGeometry(x + 1, y, w - 2, h)
+                    target.setFixedSize(w - 2, h)
+        if type(par) == int:
+            pass   
+
+    def Gene_Preview(self):
+        # 寻找self.core里面所有的
+        # Magic_Input, QLabel, QTextEdit
+        anotations = self.Core.findChildren(Magic_Input)
+        Imgs = self.Core.findChildren(QLabel)
+        Info = [self.Info]
+
+        Img = QImage(self.Core.size(),QImage.Format_ARGB32)
+        Img.fill(Qt.transparent)
+        # Img.fill('white')
+        pt = QPainter()
+        pt.begin(Img)
+
+        # 修正嵌套引起的坐标差异
+        def Get_Pos_relative_to(t, a_parent_widget):
+            x, y = t.x(), t.y()
+            p = t.parent()
+            while p != self.Core:
+              x += p.x()
+              y += p.y()
+              p = p.parent()
+            return x, y
+
+        for img in Imgs:
+            im = img.pixmap()
+            x, y =Get_Pos_relative_to(img, self.Core)
+            w, h =im.width(), im.height()
+            pt.drawPixmap(x, y, w, h, im)
+
+
+        for t in anotations:
+            pt.setPen(QPen(QColor(0, 0, 0), 3))
+            #pt.setFont(i['font'])
+            x, y =Get_Pos_relative_to(t, self.Core)
+            w, h = t.width(), t.height()
+            pt.drawText(QRectF(x, y, w, h), Qt.AlignCenter, t.text())
+        
+
+        pt.end()
+        self.Preview.setPixmap(QPixmap.fromImage(Img))
+

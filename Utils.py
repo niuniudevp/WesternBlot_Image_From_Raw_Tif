@@ -2,7 +2,7 @@
 
 from PyQt5.QtGui import QImage, QPixmap, QTransform
 from PyQt5.QtCore import Qt
-import cv2
+from Img_Utils import resize_img, rotate_img, flip_img_h, flip_img_hv, flip_img_v, bgr2rgb
 
 
 def get_marker_pos(midpos):
@@ -78,40 +78,29 @@ def Get_Mouse_Parameter(mouse_event):
 def CV_Img_to_QImage(CV_Img,
                      Scale_Factor=1,
                      Angle=0,
-                     Flap_H=False,
-                     Flap_V=False):
+                     Flip_H=False,
+                     Flip_V=False):
     '''
     将opencv读取的图片转为QImage类型
     返回QPixmap,Rotated_Size
     '''
-    height, width = CV_Img.shape[:2]
-    currentFrame = cv2.cvtColor(CV_Img, cv2.COLOR_BGR2RGB)
-    bytesPerline = 3 * width
-    img = QImage(currentFrame, width, height, bytesPerline,
-                 QImage.Format_RGB888)
-
-    if Flap_H:
-        # #上下翻转
-        mt = QTransform()
-        mt.setMatrix(1, 0, 0, 0, -1, 0, 0, 0, 1)
-        img = img.transformed(mt)
-
-    if Flap_V:
-        # 左右翻转
-        mt = QTransform()
-        mt.setMatrix(-1, 0, 0, 0, 1, 0, 0, 0, 1)
-        img = img.transformed(mt)
-
+    
+    if Flip_V:
+        CV_Img = flip_img_h(CV_Img)
+    if Flip_H:
+        CV_Img = flip_img_v(CV_Img)
     if Angle != 0:
-        mt = QTransform()
-        mt.rotate(Angle)
-        img = img.transformed(mt)
-
-    width, height = img.width(), img.height()
+        CV_Img = rotate_img(CV_Img, Angle)
+    
+    height, width = CV_Img.shape[:2]
+    CV_Img = resize_img(CV_Img, Scale_Factor)
+    currentFrame = bgr2rgb(CV_Img)
+    Nh, Nw = CV_Img.shape[:2]
+    bytesPerline = 3 * Nw
+    img = QImage(currentFrame, Nw, Nh, bytesPerline,
+                 QImage.Format_RGB888)
+    
     Im = QPixmap.fromImage(img)
-    new_size_w, new_size_h = mapped_points_with_scale_factor((width, height),
-                                                             Scale_Factor)
-    Im = Im.scaled(new_size_w, new_size_h, Qt.KeepAspectRatio)
     return Im, (width, height)
 
 

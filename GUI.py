@@ -33,23 +33,6 @@ class UI(QMainWindow):
 
     def keyPressEvent(self, event):
         self.PressedKey = event.key()
-        """
-        if self.PressedKey in [
-                Qt.Key_Right, Qt.Key_Left, Qt.Key_Up, Qt.Key_Down
-        ] and self.Active_Indicator:
-            self.ImgB.setFocus()
-
-        if self.Active_Indicator:
-            i = self.Active_Indicator
-            if self.PressedKey == Qt.Key_Up:
-                i.move(i.x(), i.y() - 1)
-            elif self.PressedKey == Qt.Key_Down:
-                i.move(i.x(), i.y() + 1)
-            elif self.PressedKey == Qt.Key_Left:
-                i.move(i.x() - 1, i.y())
-            elif self.PressedKey == Qt.Key_Right:
-                i.move(i.x() + 1, i.y())
-        """
         QMainWindow.keyPressEvent(self, event)
 
     def keyReleaseEvent(self, event):
@@ -62,8 +45,8 @@ class UI(QMainWindow):
         #self.Pre.setGeometry(10, self.ImgB.y()+ self.ImgB.height() + 10 , self.width() - 20, 150)
 
     def Test(self):
-        self.D = Demo(self)
-
+        self.D = Anotation(self)
+        self.D.SetColumn('1,2,3')
     def Set_Dir(self):
         dir = QFileDialog.getExistingDirectory(self, "Choose a Directory", "~")
         self.Select_Dir = dir
@@ -80,7 +63,7 @@ class UI(QMainWindow):
         toobar.addWidget(self.Tb)
 
         self.Files = QDockWidget('Loaded Image Files')
-        file2 = [{'wb': '/media/nzt/LENOVO1/YQ,WWY/2020-实验/wb/ChemiDoc Images 2020-03-06_12.16.39/20200306-stambpl1-in-8cells_1(Chemiluminescence).tif', 'bkgd': '/media/nzt/LENOVO1/YQ,WWY/2020-实验/wb/ChemiDoc Images 2020-03-06_12.16.39/20200306-stambpl1-in-8cells_7(Colorimetric).tif'}, {'wb': '/media/nzt/LENOVO1/YQ,WWY/2020-实验/wb/ChemiDoc Images 2020-03-06_12.16.39/20200306-otub2-in-8cells_1(Chemiluminescence).tif', 'bkgd': '/media/nzt/LENOVO1/YQ,WWY/2020-实验/wb/ChemiDoc Images 2020-03-06_12.16.39/20200306-otub2-in-8cells_8(Colorimetric).tif'}]
+        file2 = [{'wb': '/media/nzt/LENOVO1/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-03-06_12.16.39/20200306-stambpl1-in-8cells_1(Chemiluminescence).tif', 'bkgd': '/media/nzt/LENOVO1/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-03-06_12.16.39/20200306-stambpl1-in-8cells_7(Colorimetric).tif'}, {'wb': '/media/nzt/LENOVO1/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-03-06_12.16.39/20200306-otub2-in-8cells_1(Chemiluminescence).tif', 'bkgd': '/media/nzt/LENOVO1/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-03-06_12.16.39/20200306-otub2-in-8cells_8(Colorimetric).tif'}]
         self.Selected_Imgs = Img_Tree(file2, self)
         self.Selected_Imgs.enable_bottom_btn(True)
         self.Selected_Imgs.enable_contextmenu(True)
@@ -95,10 +78,12 @@ class UI(QMainWindow):
         self.Current = Frame1
         self.Tab = QTabWidget(self)
         self.Tab.addTab(self.Current, 'Main')
-        self.Preview = QFrame(self.Tab)
+        #self.Preview = QFrame(self.Tab)
+        self.Preview = Image_Editor(self.Tab)
         self.Tab.addTab(self.Preview, 'Final')
         self.setCentralWidget(self.Tab)
-        self.Tab.currentChanged.connect(self.Prev)
+        #self.Tab.currentChanged.connect(self.Prev)
+        self.Tab.currentChanged.connect(self.Prev_Slot)
         self.Tb.Changed.connect(self.Syncing_Tb_to_Imgb)
 
     # Connect Tree_Click to Tab Panel
@@ -108,6 +93,10 @@ class UI(QMainWindow):
         self.Tab.insertTab(0, self.Current, 'Current')
         self.Tab.setCurrentIndex(0)
 
+    def Prev_Slot(self, index):
+        if index == 1:
+            self.Preview.display_img(self.Selected_Imgs.Tree)
+            print(self.Selected_Imgs.imgs)
     # Preview function
     def Prev(self, index):
         if index == 1:
