@@ -59,13 +59,17 @@ class UI(QMainWindow):
     def Main(self):
         self.Tb = ToolBar(self)
         toobar = self.addToolBar("gongju")
-        opdir = QAction('Open Dir', self)
-        opdir.triggered.connect(self.Set_Dir)
-        toobar.addAction(opdir)
+        self.opdir = QAction('Open', self)
+        self.exprt = QAction('Export', self)
+        self.svprj = QAction('Save', self)
+
+        toobar.addAction(self.opdir)
+        toobar.addAction(self.svprj)
+        toobar.addAction(self.exprt)
         toobar.addWidget(self.Tb)
 
         self.Files = QDockWidget('Loaded Image Files')
-        file2 = [{'wb': '/media/nzt/LENOVO1/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-03-06_12.16.39/20200306-stambpl1-in-8cells_1(Chemiluminescence).tif', 'bkgd': '/media/nzt/LENOVO1/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-03-06_12.16.39/20200306-stambpl1-in-8cells_7(Colorimetric).tif'}, {'wb': '/media/nzt/LENOVO1/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-03-06_12.16.39/20200306-otub2-in-8cells_1(Chemiluminescence).tif', 'bkgd': '/media/nzt/LENOVO1/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-03-06_12.16.39/20200306-otub2-in-8cells_8(Colorimetric).tif'}]
+        file2 = [{'wb': '/mnt/LENOVO/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-03-06_12.16.39/20200306-stambpl1-in-8cells_1(Chemiluminescence).tif', 'bkgd': '/mnt/LENOVO/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-03-06_12.16.39/20200306-stambpl1-in-8cells_7(Colorimetric).tif'}, {'wb': '/mnt/LENOVO/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-03-06_12.16.39/20200306-otub2-in-8cells_1(Chemiluminescence).tif', 'bkgd': '/mnt/LENOVO/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-03-06_12.16.39/20200306-otub2-in-8cells_8(Colorimetric).tif'}]
         self.Selected_Imgs = Img_Tree(file2, self)
         self.Selected_Imgs.enable_bottom_btn(True)
         self.Selected_Imgs.enable_contextmenu(True)
@@ -85,8 +89,14 @@ class UI(QMainWindow):
         self.Tab.addTab(self.Preview, 'Final')
         self.setCentralWidget(self.Tab)
         #self.Tab.currentChanged.connect(self.Prev)
+
+
         self.Tab.currentChanged.connect(self.Prev_Slot)
         self.Tb.Changed.connect(self.Syncing_Tb_to_Imgb)
+        self.opdir.triggered.connect(lambda: print(""))
+        self.svprj.triggered.connect(lambda: print(""))
+        self.exprt.triggered.connect(self.Selected_Imgs.Export_Raw)
+        
 
     # Connect Tree_Click to Tab Panel
     def Connect_Tree_To_Tab(self, img_block_pre):

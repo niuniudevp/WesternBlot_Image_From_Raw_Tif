@@ -1,10 +1,11 @@
-from PyQt5.QtWidgets import QTreeWidget, QTreeWidgetItem, QAction, QMenu, QFrame, QAbstractItemView, QVBoxLayout, QPushButton
+from PyQt5.QtWidgets import QTreeWidget, QTreeWidgetItem, QAction, QMenu, QFrame, QAbstractItemView, QVBoxLayout, QPushButton, QFileDialog
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt
 from PyQt5.QtGui import QCursor, QGuiApplication
 from Image_Block_Realtime_PreView import Img_Block_Pre
-
-
+from Img_Utils import cv2RdImg, cv2PutText, cv2DrawRect, CV_Img_Transform, cv2SaveTif
 import os
+import json
+
 
 class My_TreeItem(QTreeWidgetItem):
     """
@@ -42,12 +43,12 @@ class Img_Tree(QFrame):
         self.img_dict = img_dict
         self.Tree.setHeaderHidden(True)
         self.imgs = []
+        self.Save_Dir = ''
         self.Add_top_Level_Item(self.img_dict)
         self.layout = QVBoxLayout()
         self.layout.addWidget(self.Tree)
         self.setLayout(self.layout)
         self.Tree.clicked.connect(self.Tree_click)
-
 
     def Add_top_Level_Item(self, img_dict):
         if img_dict:
@@ -70,7 +71,7 @@ class Img_Tree(QFrame):
                 # 设置不可以被Drop
                 cc.setFlags(cc.flags() & ~Qt.ItemIsDropEnabled)
                 # 设置不可以被Drag
-                cc.setFlags(cc.flags() & ~ Qt.ItemIsDragEnabled)
+                cc.setFlags(cc.flags() & ~Qt.ItemIsDragEnabled)
                 self.Tree.addTopLevelItem(c)
             self.imgs = self.imgs + img_dict
 
@@ -83,7 +84,7 @@ class Img_Tree(QFrame):
     def enable_contextmenu(self, bool):
         if bool:
             self.Tree.itemPressed.connect(self.show_menu)
-    
+
     @pyqtSlot(list)
     def connect_pop_wid(self, list):
         """
@@ -118,11 +119,11 @@ class Img_Tree(QFrame):
     def show_menu(self, item, int):
         if (QGuiApplication.mouseButtons() & Qt.RightButton):
             item.show_menu()
-    
+
     # 右键菜单Action响应
     def menu_delete(self):
         self.Tree.takeTopLevelItem(self.Tree.currentIndex().row())
-    
+
     def menu_change(self):
         item = self.Tree.currentItem()
         if item.Type == 'WB':
@@ -132,4 +133,44 @@ class Img_Tree(QFrame):
             # 只显示BKGD
             pass
 
+    def Export_Raw(self):
+        Tree_obj = self.Tree
+        Imgs = []
+        QFileDlg = QFileDialog.getExistingDirectory(self, "Select Save Dir",
+                                                    self.Save_Dir)
+        if QFileDlg:
+            self.Save_Dir = QFileDlg
+            for i in range(Tree_obj.topLevelItemCount()):
+                t = Tree_obj.topLevelItem(i)
+                Ib = t.Img_Block_Pre.ImgB
+                Imgs.append({'wb': Ib.WB.FileName, 'bkgd': Ib.BG.FileName})
+                info = Ib.Pack_Info()
+                crops = info['crop']
+                file = info['filename']
+                rotation = info['rotation']
+                flip_h = info['Flip_h']
+                flip_v = info['Flip_v']
+                cv_img = cv2RdImg(file)
+                cv_img = CV_Img_Transform(cv_img, flip_h, flip_v, rotation)
+                name = str(i)
+                for crop in crops:
+                    crop_name = crop['name']
+                    if crop_name:
+                        name += '_' + crop_name
+                    crop_rect = crop['pos']
+                    x, y, w, h = crop_rect
+                    p1 = (x, y)
+                    p2 = (x + w, y + h)
+                    cv2DrawRect(cv_img, p1, p2)
+                    cv2PutText(cv_img, crop_name, [p1, p2])
+                cv_img = CV_Img_Transform(cv_img,
+                                        flip_h,
+                                        flip_v,
+                                        -rotation,
+                                        Cut_Edge_on_Rotation=True)
+                cv2SaveTif(cv_img, os.path.join(self.Save_Dir, name + '_RAW.tif'))
+            jsondata = json.dumps(Imgs, ensure_ascii = False)
+            fh = open(os.path.join(self.Save_Dir,'Imgs.json'), 'w')
+            fh.write(jsondata)
+            fh.close()
 

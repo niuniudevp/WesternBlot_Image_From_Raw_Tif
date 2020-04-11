@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QFrame, QLabel, QLineEdit, QGridLayout, QCheckBox, QVBoxLayout, QInputDialog
+from PyQt5.QtWidgets import QFrame, QLabel, QLineEdit, QGridLayout, QCheckBox, QVBoxLayout, QInputDialog, QDialog, QFormLayout, QDialogButtonBox
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
 from Utils import *
 import cv2
@@ -302,6 +302,7 @@ class MyLabel(QLabel):
         self.Listen_Key = []  # 监听的Key
         self.Mouse_Press_Btn = None
         self.Scale_Factor = 1
+        self.Active = True
         self.clearFocus()
         print("Label send init Signal")
         print(self.sender())
@@ -481,6 +482,7 @@ class MyLabel(QLabel):
         self.PressedKey = None
         if event.key() == Qt.Key_Delete:
             self.setVisible(False)
+            self.Active = False
             ###删除时也发出change信号
             print("MyLabel send delete Signal")
             print(self.sender())
@@ -521,6 +523,15 @@ class MyLabel(QLabel):
         self.setVisible(src.isVisible())
 
 
+class Indicator_Config(object):
+    def __init__(self):
+        self.Name = ""
+        self.x = 0
+        self.y = 0
+        self.w = 0
+        self.h = 0
+
+
 class Indicator(MyLabel):
     def __init__(self, Type, *args, **kwargs):
         MyLabel.__init__(self, *args, **kwargs)
@@ -552,6 +563,28 @@ class Indicator(MyLabel):
             x, y, w = self.x(), self.y(), self.width()
             self.Name.setStyleSheet("color:white;background:blue")
             self.Name.move(x + w, y)
+
+    def Load_Config(self, Ind: Indicator_Config):
+        self.Name.setText(Ind.Name)
+        self.setGeometry(Ind.x, Ind.y, Ind.w, Ind.h)
+
+
+class Img_Config(object):
+    def __init__(self):
+        self.FileName = ""
+        self.Flip_H = False
+        self.Flip_V = False
+        self.Rotation = 0
+        self.Indicators = []
+
+    def addIndicator(self, Indicator):
+        Ind_c = Indicator_Config()
+        Ind_c.Name = Indicator.Name.text()
+        Ind_c.x = Indicator.x()
+        Ind_c.y = Indicator.y()
+        Ind_c.w = Indicator.width()
+        Ind_c.h = Indicator.height()
+        self.Indicators.append(Ind_c)
 
 
 class Img(QLabel):
@@ -632,6 +665,7 @@ class Img(QLabel):
                 if not indicator.isVisible():
                     indicator.setGeometry(x, y, 0, 0)
                     indicator.setVisible(True)
+                    indicator.Active = True
                     indicator.Scale_Factor = self.Scale_Factor
             else:
                 # 需要新建
@@ -665,6 +699,7 @@ class Img(QLabel):
                             if not b.isVisible():
                                 indicator = b
                                 indicator.setVisible(True)
+                                indicator.Active = True
                                 break
 
                         # 如果遍历后还是没有
@@ -684,21 +719,25 @@ class Img(QLabel):
             #
             if indicator:
                 indicator.setVisible(True)
+                indicator.Active = True
                 indicator.setStyleSheet("border:2px solid red")
                 # 当Wb已经选定的时候添加的Marker默认吸附到crop边框上
                 if self.Temp_Indicator:
-                    crop = self.Temp_Indicator[0] #默认只有一个
+                    crop = self.Temp_Indicator[0]  #默认只有一个
                     if crop.isVisible():
                         c_x, c_w = crop.x(), crop.width()
                         if (c_x + c_w) < x:
                             # 右侧Marker的情况
-                            indicator.setGeometry(c_x + c_w, y - Marker_h / 2, Marker_w, Marker_h)
+                            indicator.setGeometry(c_x + c_w, y - Marker_h / 2,
+                                                  Marker_w, Marker_h)
                         if x < c_x:
                             # 左侧Marker的情况
-                            indicator.setGeometry(c_x - Marker_w, y - Marker_h / 2, Marker_w, Marker_h)
+                            indicator.setGeometry(c_x - Marker_w,
+                                                  y - Marker_h / 2, Marker_w,
+                                                  Marker_h)
                 else:
                     indicator.setGeometry(x - Marker_w / 2, y - Marker_h / 2,
-                                        Marker_w, Marker_h)
+                                          Marker_w, Marker_h)
                 indicator.Scale_Factor = self.Scale_Factor
 
         QLabel.mousePressEvent(self, event)
@@ -763,6 +802,28 @@ class Img(QLabel):
         t = Get_Super_Parent(self)
         t.statusbar.showMessage("Ready " + mes)
 
+    def get_config(self):
+        c = Img_Config()
+        c.FileName = File_path(self.FileName)[1]
+        c.FileName = self.FileName
+        c.Flip_H = self.Flip_H
+        c.Flip_V = self.Flip_V
+        c.Rotation = self.Angle
+        for Ind in self.Indicator:
+            c.addIndicator(Ind)
+        return c
+
+    def Load_Config(self, Cfg: Img_Config):
+        self.FileName = Cfg.FileName
+        self.Flip_V = Cfg.Flip_V
+        self.Flip_H = Cfg.Flip_H
+        for Ind_c in Cfg.Indicators:
+            Ind = Indicator(self.Action_Type, self)
+            Ind.Load_Config(Ind_c)
+            #self.Indicator_Add.emit(self.Indicator)
+        self.__Init_UI(self.FileName)
+
+    # signal links
     @pyqtSlot()
     def Link_Indicator_Add_to_Change(self):
         self.Indicator[-1].Changed_Signal.connect(
@@ -831,3 +892,19 @@ class Img(QLabel):
         #self.Syncing_Indicator_to_Temp(src, self)
         #self.Syncing_Indicator_to_Temp(self, src)
         print("[Img] Syncing End")
+
+class Muliti_Input_Dialog(QDialog):
+    def __init__(self, *args, **kwargs):
+        QDialog.__init__(self, *args, **kwargs)
+        self.Form = QFormLayout()
+        self.setLayout(self.Form)
+        
+    def Add_row(self, *args):
+        self.Form.addRow(*args)
+    
+    def exec(self):
+        self.btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, self)
+        self.Form.addRow(self.btn_box)
+        self.btn_box.accepted.connect(self.accept)
+        self.btn_box.rejected.connect(self.reject)
+        return QDialog.exec(self)

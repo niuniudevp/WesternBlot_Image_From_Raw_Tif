@@ -2,7 +2,19 @@
 
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import Qt
-from Img_Utils import resize_img, rotate_img, flip_img_h, flip_img_v, bgr2rgb
+from Img_Utils import resize_img, rotate_img, flip_img_h, flip_img_v, bgr2rgb, CV_Img_Transform
+import os
+import cv2
+import numpy as np
+
+
+def File_path(filepath):
+    """
+    获取文件的扩展名
+    """
+    DirName, FileName = os.path.split(filepath)
+    _, ext = os.path.splitext(filepath)
+    return DirName, FileName, ext
 
 
 def get_marker_pos(midpos):
@@ -84,24 +96,29 @@ def CV_Img_to_QImage(CV_Img,
     将opencv读取的图片转为QImage类型
     返回QPixmap,Rotated_Size
     '''
-    
-    if Flip_V:
-        CV_Img = flip_img_h(CV_Img)
-    if Flip_H:
-        CV_Img = flip_img_v(CV_Img)
-    if Angle != 0:
-        CV_Img = rotate_img(CV_Img, Angle)
-    
+
+    CV_Img = CV_Img_Transform(CV_Img, Flip_H, Flip_V, Angle)
+
     height, width = CV_Img.shape[:2]
     CV_Img = resize_img(CV_Img, Scale_Factor)
     currentFrame = bgr2rgb(CV_Img)
     Nh, Nw = CV_Img.shape[:2]
     bytesPerline = 3 * Nw
-    img = QImage(currentFrame, Nw, Nh, bytesPerline,
-                 QImage.Format_RGB888)
-    
+    img = QImage(currentFrame, Nw, Nh, bytesPerline, QImage.Format_RGB888)
+
     Im = QPixmap.fromImage(img)
     return Im, (width, height)
+
+
+def QImage_to_CV_Img(QImg):
+    # 将QImage 转化为CV_Img
+    h, w = QImg.height(), QImg.width()
+    channel = int(QImg.byteCount() / h / w)
+    b = QImg.bits()
+    # sip.voidptr must know size to support python buffer interface
+    b.setsize(QImg.byteCount())
+    mat = np.array(b, np.uint8).reshape(h, w, channel)
+    return(mat)
 
 
 def Get_Super_Parent(widget):

@@ -2,7 +2,8 @@ from PyQt5.QtWidgets import QLineEdit, QFrame, QHBoxLayout, QComboBox, QPushButt
 from Base import LabeledInPut
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QPainter, QPen
-from Utils import Get_Super_Parent
+from Utils import Get_Super_Parent, QImage_to_CV_Img
+from bound_detect import bound_from_cv_img
 
 
 class Magic_Input(QLineEdit):

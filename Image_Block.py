@@ -175,8 +175,8 @@ class Img_Block(QFrame):
         info['Flip_v'] = self.WB.Img.Flip_V
         info['crop'] = []
         info['markers'] = []
-        crops = [i for i in self.WB.Img.Indicator if i.isVisible()] # 确保只有可见的Indicator
-        markers = [i for i in self.BG.Img.Indicator if i.isVisible()] # 确保只有可见的Indicator
+        crops = [i for i in self.WB.Img.Indicator if i.Active] # 确保只有可见的Indicator
+        markers = [i for i in self.BG.Img.Indicator if i.Active] # 确保只有可见的Indicator
         for i in crops:
             info['crop'].append({'name': i.Name.text(), 'pos': i.Acture_Pos()})
         for i in markers:
