@@ -1,7 +1,9 @@
-from PyQt5.QtWidgets import QFrame, QLabel, QLineEdit, QGridLayout, QCheckBox, QVBoxLayout, QInputDialog, QDialog, QFormLayout, QDialogButtonBox
+from PyQt5.QtWidgets import QFrame, QLabel, QLineEdit, QGridLayout, QCheckBox, QVBoxLayout, QHBoxLayout, QInputDialog, QDialog, QFormLayout, QDialogButtonBox
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
+from PyQt5.QtGui import QFont
 from Utils import *
 import cv2
+from Config import *
 
 
 class LabeledInPut(QFrame):
@@ -103,13 +105,21 @@ class Box(QFrame):
 
     Changed_Signal = pyqtSignal()
 
-    def __init__(self, label, paras_labels, *args, **kwargs):
+    def __init__(self, label, paras_labels,style='QGrid', *args, **kwargs):
 
         QFrame.__init__(self, *args, **kwargs)
-        Gd = QGridLayout(self)
+        if style == 'QGrid':
+            Gd = QGridLayout(self)
+        if style == 'QHBoxLayout':
+            Gd=QHBoxLayout(self)
+        if style == 'QVBoxLayout':
+            Gd=QVBoxLayout(self)
         self.Label = QLabel(label, self)
         paras_labels = list(paras_labels)
-        Gd.addWidget(self.Label, 0, 0, 2, 1)
+        if style=='QGrid':
+            Gd.addWidget(self.Label, 0, 0, 2, 1)
+        else:
+            Gd.addWidget(self.Label)
         for i in paras_labels:
             self.__dict__.update({"Input_" + i: LabeledInPut(i, 10, self)})
         lt = len(paras_labels)
@@ -120,9 +130,12 @@ class Box(QFrame):
                 try:
                     s = paras_labels.pop(0)
                     l = eval("self.Input_" + s)
-                    Gd.addWidget(l, row, col)
+                    if style=='QGrid':
+                        Gd.addWidget(l, row, col)
+                    else:
+                        Gd.addWidget(l)
                 except IndexError:
-                    print("Nothong")
+                    print("Nothing")
         self.setLayout(Gd)
         self.Layout = Gd
         self.style_set()
@@ -157,13 +170,13 @@ class ToolBar(QFrame):
         self.Rotation.Set_Max_value(90)
         self.Flip_H = QCheckBox('Flip_H', self)
         self.Flip_V = QCheckBox('Flip_V', self)
-        self.Crop = Box('Crop: ', 'xywh', self)
-        self.Marker = Box('Marker: ', 'wh', self)
+        self.Crop = Box('Crop: ', 'whxy','QHBoxLayout', self)
+        self.Marker = Box('Marker: ', 'wh','QHBoxLayout', self)
         self.Marker.Input_w.SetText(70)
         self.Marker.Input_h.SetText(15)
         self.Hv = QGridLayout(self)
         self.blk = QLabel('', self)
-        v = QVBoxLayout()
+        v = QHBoxLayout()
         v.addWidget(self.Flip_H)
         v.addWidget(self.Flip_V)
         self.Hv.addWidget(self.Rotation, 0, 1)
@@ -185,6 +198,9 @@ class ToolBar(QFrame):
     def Toolbar_Send_Signal(self):
         print("Toolbar send signal!")
         print(self.sender())
+        w,h=self.Crop.Input_w.Value(), self.Crop.Input_h.Value()
+        Pre_Crop['w']=w
+        Pre_Crop['h']=h
         self.Changed.emit()
 
     # 从Img_Block进行同步
@@ -198,6 +214,8 @@ class ToolBar(QFrame):
             t = Imgb.WB.Img.Indicator[0]
             if t.isVisible():
                 x, y, w, h = t.Acture_Pos()
+                Pre_Crop['w']=w
+                Pre_Crop['h']=h
             else:
                 x, y, w, h = 0, 0, 0, 0
             self.Crop.Input_x.SetText(x)
@@ -546,12 +564,17 @@ class Indicator(MyLabel):
 
     def mouseDoubleClickEvent(self, event):
         if self.hasFocus():
-            text, okPressed = QInputDialog.getText(None, "Add Name",
-                                                   "Input a name:",
-                                                   QLineEdit.Normal,
-                                                   self.Name.text())
+            font = QFont('Arial',C_Font_Size['UI']-2)
+            inputDialog = QInputDialog(None)
+            inputDialog.setInputMode(QInputDialog.TextInput)
+            inputDialog.setWindowTitle('Input a name')
+            inputDialog.setLabelText('Enter the name for this Indicator')
+            inputDialog.setTextValue(self.Name.text())
+            inputDialog.setFont(font)
+            okPressed = inputDialog.exec_() 
+
             if okPressed:
-                self.Name.setText(text)
+                self.Name.setText(inputDialog.textValue())
                 self.Name.show()
                 self.Attach_Name_Label()
                 print("%s Send text change Signal" % self)
@@ -663,7 +686,7 @@ class Img(QLabel):
             if self.Indicator:
                 indicator = self.Indicator[0]
                 if not indicator.isVisible():
-                    indicator.setGeometry(x, y, 0, 0)
+                    indicator.setGeometry(x, y, Pre_Crop['w'], Pre_Crop['h'])
                     indicator.setVisible(True)
                     indicator.Active = True
                     indicator.Scale_Factor = self.Scale_Factor
@@ -676,7 +699,7 @@ class Img(QLabel):
                 self.Indicator_Add.emit(self.Indicator)
 
                 indicator.setStyleSheet("border:2px solid red")
-                indicator.setGeometry(x, y, 0, 0)
+                indicator.setGeometry(x, y, Pre_Crop['w'], Pre_Crop['h'])
 
         if btn == "LEFT" and self.Action_Type == 'BKGD':
             print("BKGD_LEFT")
@@ -751,6 +774,8 @@ class Img(QLabel):
             indicator = self.Indicator[0]
             x, y, w, h = Rect_From_Two_Point(self.Mouse_Press_Loc, [x, y])
             indicator.setGeometry(x, y, w, h)
+            Pre_Crop['w']=w
+            Pre_Crop['h']=h
             #print("Img 画框 Indicator 改变 Signal")
             #indicator.Changed_Signal.emit()
         QLabel.mouseMoveEvent(self, event)

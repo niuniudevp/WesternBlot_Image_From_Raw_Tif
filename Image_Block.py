@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QScrollArea, QFrame, QLabel, QVBoxLayout, QHBoxLayou
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt
 from Base import Img
 from Utils import Get_Pressed_Key, mapped_points_with_scale_factor
+import os
 
 
 class MyScrollArea(QScrollArea):
@@ -80,8 +81,9 @@ class LabeledImg(QFrame):
         # self.setMouseTracking(True)
         self.FileName = Filename
         self.Img = Img(self.FileName, self)
-        self.Label = QLabel(self.FileName, self)
-        self.Label.setWordWrap(True)
+        _,name=os.path.split(self.FileName)
+        self.Label = QLabel(name, self)
+        self.Label.setWordWrap(False)
         self.scoller = MyScrollArea(self)
         self.scoller.setWidget(self.Img)
         self.scoller.setWidgetResizable(False)

@@ -15,11 +15,13 @@ class BioRad_Imgs():
         self.Dir = Path
         self.Img = Img
         self.ext = ext
-        self.Name_Pattern = re.findall(r'(.+)_\d', Img)[0]
+        self.Name_Pattern = re.findall(r'(.+?)_?\d?\(', Img)[0]
+        self.Name_Pattern = self.Name_Pattern.split('_')[0]
         self.WB_list = []
         self.BKGD_list = []
         self.search_same_files(self.Dir)
-        self.wb_index = self.WB_list.index(os.path.join(Path, Img)) if 'Chemiluminescence' in Img else 0
+        #self.wb_index = self.WB_list.index(os.path.join(Path, Img)) if 'Chemiluminescence' or 'Composite' in Img else 0
+        self.wb_index = self.WB_list.index(os.path.join(Path, Img)) if 'Chemiluminescence' in Img else 0        
         self.bkgd_index = self.BKGD_list.index(os.path.join(Path, Img)) if 'Colorimetric' in Img else 0
     
     def search_same_files(self, Dir):
@@ -29,6 +31,10 @@ class BioRad_Imgs():
             t = os.path.join(Dir, item)
             if 'Chemiluminescence)' + self.ext in item:
                 self.WB_list.append(t)
+            """
+            if 'Composite)' + self.ext in item:
+                self.WB_list.append(t)
+            """
             if 'Colorimetric)' + self.ext in item:
                 self.BKGD_list.append(t)
             if os.path.isdir(t):

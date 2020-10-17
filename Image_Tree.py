@@ -5,6 +5,7 @@ from Image_Block_Realtime_PreView import Img_Block_Pre
 from Img_Utils import cv2RdImg, cv2PutText, cv2DrawRect, CV_Img_Transform, cv2SaveTif
 import os
 import json
+from Config import *
 
 
 class My_TreeItem(QTreeWidgetItem):
@@ -21,6 +22,7 @@ class My_TreeItem(QTreeWidgetItem):
 
     def show_menu(self):
         menu = QMenu()
+        menu.setStyleSheet("font-size:%spt" % str(C_Font_Size['UI']-2))
         menu.addAction(self.act_change)
         if self.Type == 'WB':
             menu.addAction(self.act_delete)
@@ -136,6 +138,7 @@ class Img_Tree(QFrame):
     def Export_Raw(self):
         Tree_obj = self.Tree
         Imgs = []
+        Infos=[]
         QFileDlg = QFileDialog.getExistingDirectory(self, "Select Save Dir",
                                                     self.Save_Dir)
         if QFileDlg:
@@ -145,6 +148,7 @@ class Img_Tree(QFrame):
                 Ib = t.Img_Block_Pre.ImgB
                 Imgs.append({'wb': Ib.WB.FileName, 'bkgd': Ib.BG.FileName})
                 info = Ib.Pack_Info()
+                
                 crops = info['crop']
                 file = info['filename']
                 rotation = info['rotation']
@@ -169,7 +173,14 @@ class Img_Tree(QFrame):
                                         -rotation,
                                         Cut_Edge_on_Rotation=True)
                 cv2SaveTif(cv_img, os.path.join(self.Save_Dir, name + '_RAW.tif'))
+                del info['src_img']
+                info['w']=cv_img.shape[1]
+                info['h']=cv_img.shape[0]
+                Infos.append(info)
             jsondata = json.dumps(Imgs, ensure_ascii = False)
+            infoJson=json.dumps(Infos,ensure_ascii= False)
+            with open(os.path.join(self.Save_Dir,'Infos.json'),'w') as fh:
+                fh.write(infoJson)
             fh = open(os.path.join(self.Save_Dir,'Imgs.json'), 'w')
             fh.write(jsondata)
             fh.close()

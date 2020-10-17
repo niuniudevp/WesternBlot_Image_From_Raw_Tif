@@ -1,3 +1,4 @@
+#***coding=utf-8***
 from PyQt5.QtWidgets import QMainWindow, QLabel, QTabWidget, QDockWidget, QListWidget, QAction, QFileDialog
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
@@ -5,6 +6,7 @@ from Base import ToolBar
 from Image_Tree import Img_Tree
 from Image_Editor import Image_Editor
 import os
+from Config import *
 
 
 class UI(QMainWindow):
@@ -13,17 +15,18 @@ class UI(QMainWindow):
         self.Select_Dir = '~'
         self.Dir_content = None
         self.File_list = QListWidget()
-
+        self.setStyleSheet("font-size: %spt; font-family:Arial" % str(C_Font_Size['UI']))
         self.init_UI()
 
     def init_UI(self):
         self.statusbar = self.statusBar()
         self.statusbar.showMessage('Ready')
-        self.setGeometry(300, 300, 1500, 750)
+        self.setGeometry(200, 200, 1500, 600)
         self.setWindowTitle('Auto My Western Blot')
         self.setMouseTracking(True)
         self.PressedKey = None
         self.Active_Indicator = None
+        #self.setWindowState(Qt.WindowMaximized)
 
         #self.Test()
         self.Main()
@@ -69,7 +72,7 @@ class UI(QMainWindow):
         toobar.addWidget(self.Tb)
 
         self.Files = QDockWidget('Loaded Image Files')
-        file2 = [{'wb': '/mnt/LENOVO/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-03-06_12.16.39/20200306-stambpl1-in-8cells_1(Chemiluminescence).tif', 'bkgd': '/mnt/LENOVO/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-03-06_12.16.39/20200306-stambpl1-in-8cells_7(Colorimetric).tif'}, {'wb': '/mnt/LENOVO/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-03-06_12.16.39/20200306-otub2-in-8cells_1(Chemiluminescence).tif', 'bkgd': '/mnt/LENOVO/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-03-06_12.16.39/20200306-otub2-in-8cells_8(Colorimetric).tif'}]
+        file2 = [{'bkgd': '/mnt/d/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-09-06-2/nzt-rko-baf-a1+chemo24h-lc3_4(Colorimetric).tif', 'wb': '/mnt/d/YQ,WWY/2020-实验/wb/Source_Data/ChemiDoc Images 2020-09-06-2/nzt-rko-baf-a1+chemo24h-lc3_1(Chemiluminescence).tif'}]
         self.Selected_Imgs = Img_Tree(file2, self)
         self.Selected_Imgs.enable_bottom_btn(True)
         self.Selected_Imgs.enable_contextmenu(True)
@@ -94,7 +97,7 @@ class UI(QMainWindow):
         self.Tab.currentChanged.connect(self.Prev_Slot)
         self.Tb.Changed.connect(self.Syncing_Tb_to_Imgb)
         self.opdir.triggered.connect(lambda: print(""))
-        self.svprj.triggered.connect(lambda: print(""))
+        self.svprj.triggered.connect(self.Preview.Save_Img)
         self.exprt.triggered.connect(self.Selected_Imgs.Export_Raw)
         
 

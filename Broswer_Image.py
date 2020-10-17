@@ -5,6 +5,7 @@ from Image_Tree import Img_Tree
 from Factory import BioRad_Imgs
 import cv2
 import os
+from Config import *
 
 
 class Broswer_Img(QMainWindow):
@@ -16,6 +17,7 @@ class Broswer_Img(QMainWindow):
     def __init__(self, *args, **kwargs):
         QMainWindow.__init__(self, *args, **kwargs)
         self.Current_Dir = QDir.home().absolutePath()
+        #self.Current_Dir = Wk_Dir
         self.setWindowTitle("Select Imags")
         self.setWindowModality(Qt.ApplicationModal)
         self.Left_Dock_Code()
@@ -28,8 +30,8 @@ class Broswer_Img(QMainWindow):
         self.bkgd_nav_left.setEnabled(False)
         self.bkgd_nav_right.setEnabled(False)
 
-        self.setGeometry(200, 200, 1700, 680)
-        self.setMaximumSize(QSize(1700, 680))
+        #self.setGeometry(200, 200, 1000, 600)
+        #self.setMaximumSize(QSize(1000, 600))
 
     def Left_Dock_Code(self):
         self.Left_Frame = QFrame(self)
@@ -67,8 +69,8 @@ class Broswer_Img(QMainWindow):
         self.wb.setScaledContents(True)
         self.bkgd = QLabel(self.Central_Frame)
         self.bkgd.setScaledContents(True)
-        self.wb.setMaximumSize(QSize(561, 449))
-        self.bkgd.setMaximumSize(QSize(561, 449))
+        self.wb.setMaximumSize(QSize(300, 300))
+        self.bkgd.setMaximumSize(QSize(300, 300))
 
         self.wb_navigator = QFrame(self.Central_Frame)
         self.wb_nav_left = QPushButton('<--', self.wb_navigator)
@@ -191,7 +193,9 @@ class Broswer_Img(QMainWindow):
         self.Close_Signal.emit(self.Added_Img_tree.imgs)
 
     def dir_selection(self):
-        dir = QFileDialog.getExistingDirectory(self, "Choose a Directory", "~")
+        global Wk_Dir
+        dir = QFileDialog.getExistingDirectory(self, "Choose a Directory", Wk_Dir)
         self.Current_Dir = dir
+        Wk_Dir=dir
         self.Tree.setRootIndex(self.Model.index(self.Current_Dir))
         self.Left_Dock.setWindowTitle(dir)

@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QLineEdit, QFrame, QHBoxLayout, QComboBox, QPushButton
+from PyQt5.QtWidgets import QLineEdit, QFrame, QHBoxLayout, QComboBox, QPushButton, QGridLayout
 from Base import LabeledInPut
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QPainter, QPen
@@ -36,8 +36,7 @@ class Magic_Input(QLineEdit):
         All_Magic_input = P.findChildren(Magic_Input)
         for t in All_Magic_input:
             t.Actived = False
-            t.setFixedSize(t.width(), t.height())
-
+            #t.setFixedSize(t.width(), t.height())
             t.setStyleSheet('border:1px solid red')
         self.Actived = True
         self.setStyleSheet('border: 2px solid green')
@@ -49,25 +48,41 @@ class Anotation(QFrame):
     def __init__(self, *args, **kwargs):
         QFrame.__init__(self, *args, **kwargs)
         self.Label = ""
-        hv = QHBoxLayout()
+        self.Inputs =[]
+        #hv = QHBoxLayout()
+        hv = QGridLayout()
         hv.setContentsMargins(0, 0, 0, 0)
-        hv.setSpacing(2)
+        hv.setSpacing(0)
         self.setLayout(hv)
         self.resize(500, 30)
         self.setStyleSheet("border: 1px solid red")
 
-    def SetColumn(self, split_str):
+    def SetColumn(self, split: list, start_pos, end_pos):
         """
         逗号分割各个部分的比例
         """
-        space_list = split_str.split(',')
+        space_list = split[1]
+        split_str = split[0]
+        
         ly = self.layout()
+        self.start_pos = start_pos
+        self.end_pos = end_pos
+        
         for i in range(len(space_list)):
+            wid = int(space_list[i])
             t = Magic_Input(self)
             t.setAlignment(Qt.AlignCenter)
-            #t.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-            ly.addWidget(t)
-            ly.setStretchFactor(t, int(space_list[i]))
+            t.setMaximumWidth(wid)
+            ly.addWidget(t, 0, i, 1, split_str[i], Qt.AlignCenter)
+            ly.setColumnStretch(i, wid)
+        """
+        for i in range(len(space_list)-1):
+            t = Magic_Input(self)
+            t.show()
+            t.setGeometry(space_list[i], 15, space_list[i+1] - space_list[i], 30)
+            #ly.addWidget(t)
+            self.Inputs.append(t)
+        """
 
     def SetFont(self, QFont):
         for item in self.layout().count:

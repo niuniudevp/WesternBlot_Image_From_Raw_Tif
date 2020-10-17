@@ -1,9 +1,9 @@
-from PyQt5.QtWidgets import QScrollArea, QLabel
+from PyQt5.QtWidgets import QScrollArea, QLabel, QFrame
 from PyQt5.QtCore import Qt, QSize, QRectF, pyqtSlot
-from PyQt5.QtGui import QFont, QPainter, QPen, QColor, QPixmap, QImage
+from PyQt5.QtGui import QFont, QFontMetrics, QPainter, QPen, QColor, QPixmap, QImage
 from Utils import CV_Img_to_QImage
 import cv2
-
+from Config import *
 
 class Realtime_PreView_Img(QScrollArea):
     def __init__(self, *args, **kwargs):
@@ -19,11 +19,12 @@ class Realtime_PreView_Img(QScrollArea):
         self.draw_marker = []  # {'rect':#}
         self.draw_Img = []  # {'rect':#}
         self.draw_rec = []  # {'rect':#}
-        self.Temp = QLabel(self)
+        #self.Temp = QLabel(self)
         self.PreView_Img = None
         self.View = QLabel(self)
         self.View.setAlignment(Qt.AlignCenter)
-        self.View.setScaledContents(False)
+        self.View.setScaledContents(True) # Preview自适应
+        #self.View.setMaximumWidth(700)
         self.setWidget(self.View)
         self.setAlignment(Qt.AlignCenter)
         self.View.setStyleSheet("border:2px solid red")
@@ -37,8 +38,8 @@ class Realtime_PreView_Img(QScrollArea):
         if 'src_img' not in self.View_Info.keys():
             self.View_Info['src_img'] = cv2.imread(self.View_Info['filename'])
 
-        self.Gene_Font = QFont('Arial', 20)
-        self.Marker_Font = QFont('Arial', 14)
+        self.Gene_Font = QFont('Arial', C_Font_Size['Gene'])
+        self.Marker_Font = QFont('Arial', C_Font_Size['Marker'])
 
         ###单独只有一项的时候默认将文字标签放在右边
         if len(self.View_Info['crop']) > 0 and len(
@@ -56,11 +57,11 @@ class Realtime_PreView_Img(QScrollArea):
         获取 text设置为相应字体时候的大小
         w,h=Text_size
         """
-        self.Temp.setVisible(False)
-        self.Temp.setFont(font)
-        self.Temp.setText(text)
-        self.Temp.adjustSize()
-        return self.Temp.width(), self.Temp.height()
+                    ### using QFontMetrics to get font size
+        ff=QFontMetrics(font)
+        text_w=ff.width(text)
+        text_h=ff.height()
+        return text_w,text_h
 
     def Rearange(self):
         self.draw_text = []  # {'text':#,'font':#,'rect':#}
@@ -95,6 +96,7 @@ class Realtime_PreView_Img(QScrollArea):
         for c in self.View_Info['crop']:
             text = c['name']
             text_w, text_h = self.Text_size(text + self.Spacer, self.Gene_Font)
+
             m_x, m_y, m_w, m_h = c['pos']
             if self.Postion_Type == 2:  # Gene >> Strip >> Marker
                 text_pos = (m_x - text_w - 8, m_y - int(
@@ -165,7 +167,7 @@ class Realtime_PreView_Img(QScrollArea):
             pt.setFont(i['font'])
             x, y, w, h = self.rect_fix(i['rect'])
             pt.drawText(QRectF(x, y, w, h), i['align'], i['text'])
-            #pt.drawRect(QRect(x,y,w,h))
+            #pt.drawRect(QRectF(x,y,w,h))
 
         for r in self.draw_rec:
             x, y, w, h = self.rect_fix(r['rect'])
@@ -194,7 +196,11 @@ class Realtime_PreView_Img(QScrollArea):
         info = Img.Pack_Info()
         self.Load_info(info)
         Img = self.PreView()
-        self.View.setPixmap(QPixmap.fromImage(Img))
+        t=QPixmap.fromImage(Img)
+        #限定Preview地大小便于预览
+        if t.width() > self.width():
+            t=t.scaled(QSize(self.width(),self.height()),Qt.KeepAspectRatio)
+        self.View.setPixmap(t)
         self.PreView_Img = Img
         self.View.adjustSize()
 
